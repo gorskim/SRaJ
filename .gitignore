@@ -4,3 +4,4 @@
 deps/deps.jl
 data/*.jpg
 data/*.png
+flickr_credentials.txt
