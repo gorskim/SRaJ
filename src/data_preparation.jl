@@ -1,4 +1,4 @@
-using Images, Colors, JLD2, ProgressMeter
+using Images, Colors, JLD2, ProgressMeter, ImageFiltering
 using TestImages: testimage
 
 
@@ -63,21 +63,23 @@ end
 """
     prepare_data(dir, zoom, new_size)
 
+SIGNIFICANT: Don't use in this form, super-inefficient code (TODO: improvement)
 Prepare data (images) in a given directory for the training process.
 
 # Examples
-prepare_data("data/dataset", 0.25, 64)
+prepare_data("data/dataset", 0.50, 64)
 """
 function prepare_data(dir::String, zoom::Float64, new_size::Int64)
     # prepare the set of images of the default quality
     x = Matrix{Float32}[]
     y = Matrix{Float32}[]
-    @info "Cropping, resizing, creating matrices of arrays:"
+    @info "Cropping, blurring, resizing, creating matrices of arrays:"
     @showprogress for img_file in readdir(dir)
         img = load(joinpath(dir, img_file))
         cropped_images = crop_image(RGB.(float.(img)), new_size)
         for cropped in cropped_images
-            resized = imresize(cropped, ratio=zoom)
+            blurred = imfilter(cropped, Kernel.gaussian(3))
+            resized = imresize(blurred, ratio=zoom)
             x = vcat(x, [resized])
         end
         y = vcat(y, cropped_images)
@@ -97,9 +99,11 @@ end
 function main()
     # x, y = prepare_data(TEST_IMAGES_DIR, IMAGE_ZOOM, IMAGE_SIZE)
     # @info "Saving to JLD2 format..."
-    # @save joinpath(TEST_IMAGES_DIR, "test_dataset.jld2") x y
+    # @save "data/test_dataset.jld2" x y
 
-    lr, hr = prepare_data(TRAINING_DATASET_DIR, IMAGE_ZOOM, IMAGE_SIZE)
+    x, y = prepare_data(TRAINING_DATASET_DIR, IMAGE_ZOOM, IMAGE_SIZE)
     @info "Saving to JLD2 format..."
-    @save joinpath(TRAINING_DATASET_DIR, "training_dataset.jld2") lr hr
+    @save "data/training_dataset.jld2" x y
 end
+
+# main()
