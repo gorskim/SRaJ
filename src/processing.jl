@@ -1,4 +1,4 @@
-using Knet
+using Flux, ImageQualityIndexes
 
 include("data_preparation.jl")
 
@@ -10,17 +10,11 @@ IMAGE_CHANNELS = 3
 EPOCHS = 10^4
 BATCH_SIZE = 100
 SEED = 123
-SAVE_FREQ = 100  # ? is it necessary?
+SAVE_FREQ = 100  # ?
 ALPHA = 0.2
 LEARNING_RATE = 0.0002  # for optimizer (Adam)
-BETA1 = 0.5  # Adam parametetrs for bias corrected moments
+BETA1 = 0.8  # Adam parametetrs for bias corrected moments
 NOISE_DIM = 100
-
-xtrn,ytrn,_,_= mnist()
-
-xtrn[:,:,1,1]
-xtrn
-dtrn = minibatch(lr, hr, 100; shuffle=true, xtype=Array{Float32})
 
 ###### main
 wd, wg, md, mg = load_weights
@@ -31,7 +25,14 @@ end
 function G()
 end
 
-function init_weights(atype=atype, noise_dim=NOISE_DIM, winit)
+function Dloss()
+end
+
+
+function Gloss()
+end
+
+function init_weights(array_type, noise_dim)
     w = Any[]
     m = Any[]
 end
