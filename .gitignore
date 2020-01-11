@@ -7,3 +7,4 @@ data/dataset
 data/*.png
 flickr_credentials.txt
 *.jld2
+temp.jl
