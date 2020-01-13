@@ -1,12 +1,14 @@
 using Images, Colors, JLD2, ProgressMeter, ImageFiltering
 using TestImages: testimage
-
+using Random:shuffle! # for shuffle
+using Base.Iterators:partition
+using CuArrays
 
 # constants definition
 TRAINING_DATASET_DIR = "data/dataset"
-TEST_IMAGES_DIR = "data/test_data"  # testing = playing with new methods, etc.
-TEST_IMAGES = ["lighthouse", "mandril_color", "lena_color_512", "peppers_color",
-               "woman_blonde"]
+LR_IMAGES = "data/prepared_dataset/LR"
+HR_IMAGES = "data/prepared_dataset/HR"
+PLAYGROUND_DIR = "data/test_data"  # testing = playing with new methods, etc.
 IMAGE_ZOOM = 0.25
 IMAGE_SIZE = 64  # e.g. 64 stands for 64x64 pixels (always square images)
 
@@ -27,7 +29,7 @@ function crop_image(image::Array, new_size::Int64)
     image = image[1:cropped_size, 1:cropped_size]
 
     # create the array for new images
-    cropped_images = Array[]
+    cropped_images = []
     horizontal_start = 1
     for i in 1:Int(cropped_size / new_size)
         vertical_start = 1
@@ -63,47 +65,40 @@ end
 """
     prepare_data(dir, zoom, new_size)
 
-SIGNIFICANT: Don't use in this form, super-inefficient code (TODO: improvement)
 Prepare data (images) in a given directory for the training process.
 
 # Examples
-prepare_data("data/dataset", 0.50, 64)
+prepare_data("data/dataset", "HR", "LR", 0.50, 64)
 """
-function prepare_data(dir::String, zoom::Float64, new_size::Int64)
-    # prepare the set of images of the default quality
-    x = Matrix{Float32}[]
-    y = Matrix{Float32}[]
-    @info "Cropping, blurring, resizing, creating matrices of arrays:"
+function prepare_data(dir::String, HR_dir::String, LR_dir::String,
+					  zoom::Float64, new_size::Int64)
+    @info "Cropping, blurring, resizing, creating arrays:"
     @showprogress for img_file in readdir(dir)
-        img = load(joinpath(dir, img_file))
-        cropped_images = crop_image(RGB.(float.(img)), new_size)
+        img = RGB.(load(joinpath(dir, img_file)))
+        cropped_images = crop_image(img, new_size)
+        i = 1
         for cropped in cropped_images
+            i += 1
+			out_file = "$i.png"
+            save(joinpath(HR_dir, out_file), cropped)
             blurred = imfilter(cropped, Kernel.gaussian(3))
-            resized = imresize(blurred, ratio=zoom)
-            x = vcat(x, [resized])
+            downsampled = imresize(blurred, ratio=zoom)
+            save(joinpath(LR_dir, "d$out_file"), downsampled)
         end
-        y = vcat(y, cropped_images)
     end
 
-    @info "Converting low-resolution data to 4D array (channelview)..."
-    @time lr = reduce((a, b) -> cat(a, b, dims=4), permutedims(channelview(img),
-               (2, 3, 1)) for img in x)
-    @info "Converting high-resolution data to 4D array (channelview):"
-    @time hr = reduce((a, b) -> cat(a, b, dims=4), permutedims(channelview(img),
-               (2, 3, 1)) for img in y)
-
-    lr, hr
+    # @info "Converting data to 4D array"
+    # LR_images = reshape(cat(LR_images..., dims=4),
+    #                     Int(new_size * zoom), Int(new_size * zoom), 3, length(LR_images))
+    # HR_images = reshape(cat(HR_images..., dims=4),
+    #                     Int(new_size), Int(new_size), 3, length(HR_images))
+	#
+    # LR_images, HR_images
 end
 
 
-function main()
-    # x, y = prepare_data(TEST_IMAGES_DIR, IMAGE_ZOOM, IMAGE_SIZE)
-    # @info "Saving to JLD2 format..."
-    # @save "data/test_dataset.jld2" x y
 
-    x, y = prepare_data(TRAINING_DATASET_DIR, IMAGE_ZOOM, IMAGE_SIZE)
-    @info "Saving to JLD2 format..."
-    @save "data/training_dataset.jld2" x y
+function prepare_dataset()
+    prepare_data(TRAINING_DATASET_DIR, HR_IMAGES, LR_IMAGES, IMAGE_ZOOM, IMAGE_SIZE)
+	@info "Dataset prepared."
 end
-
-# main()
