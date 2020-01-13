@@ -9,10 +9,10 @@ include("processing.jl")
 MODELS_PATH = "models/"
 ε = Float32(1e-8)
 IMAGE_CHANNELS = 3
-EPOCHS = 10^5
-MINIBATCH_SIZE = 64  # 32 - 128
+EPOCHS = 5 * 10^4
+MINIBATCH_SIZE = 32  # 32 - 128
 SEED = 123
-NOISE_DIM = 100  # ? size vector to generate images from
+NOISE_DIM = 128  # ? size vector to generate images from
 SAVE_FREQ = 100  # ? is it necessary?
 α = 0.2
 SEED = 123
@@ -37,7 +37,7 @@ function train_step(HR, LR)  # CHECK IT
     HR = normalize(HR)
     d_gs = Tracker.gradient(() -> dloss(HR, LR), params(discriminator))
     update!(optimizer, params(discriminator), d_gs)
-    g_gs = Tracker.gradient(() -> g_loss(HR, LR), params(generator))
+    g_gs = Tracker.gradient(() -> gloss(HR, LR), params(generator))
     update!(optimizer, params(generator), g_gs)
 end
 
@@ -62,10 +62,12 @@ function train(;prepare_dataset=false)
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
             HR, LR = get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-            train_step(HR |> gpu, LR |> gpu)
+            weights = train_step(HR |> gpu, LR |> gpu)
         end
     end
 
+    model = model |> cpu  # super important!
+    @save "MODELS_PATH/final_model.jld2" model
     current_time = now()
     @info "$current_time\nTraining process completed. The model saved at: $MODELS_PATH"
 end
