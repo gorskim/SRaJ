@@ -37,7 +37,7 @@ expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
 optimizer = ADAM(η, (β1, β2))
 
-
+# util functions and layers
 function load_vgg()
     vgg = VGG19() |> gpu  # Metalhead.jl
     vgg = Chain(vgg.layers[1:20]...) # triple dots include Dropout, Dense, Softmax
@@ -45,20 +45,37 @@ function load_vgg()
     vgg
 end
 
+
+mutable struct PRelu{T}
+    α::T
+end
+
+@treelike PRelu
+
+PRelu(img_channels::Int; init=Flux.glorot_uniform) = PRelu(param(init(img_channels)))
+
+function (m::PRelu)(x)
+	if size(x)[end - 1] == length(m.α)
+		return max.(0.0f0, x) .+
+			  (reshape(m.α, ones(Int64, length(size(x)) - 2)...,
+	                   length(m.α), 1) .* min.(0.0f0, x))
+    else
+		error("Dimensions mismatch.\n
+		       length of α: $(length(m.α))\nnumber of channels: $(size(x)[end-1])")
+	end
+end
+
+# networks definition
 function discriminator()
 end
-
-
-function dloss()
-end
-
 
 function generator()
 end
 
 
-function gloss()
+# losses definition
+function dloss()
 end
 
-function save_model()
+function gloss()
 end
