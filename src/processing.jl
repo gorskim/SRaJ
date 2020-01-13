@@ -13,18 +13,21 @@ EPOCHS = 10^4
 BATCH_SIZE = 100
 SEED = 123
 SAVE_FREQ = 100  # ?
-ALPHA = 0.2
-LEARNING_RATE = 0.0002  # for optimizer (Adam)
-BETA1 = 0.8  # Adam parametetrs for bias corrected moments
+α = 0.2
+η = 10^(-4) # learning rate for optimizer (Adam)
+β1, β2 = 0.9, 0.999  # Adam parametetrs for bias corrected moments
 NOISE_DIM = 100
 
 
 # one-liners
 load_image(filename) = Float32.(channelview(load(filename)))
-bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ 1f-10) - (1  .- y) .* log.(1 .- ŷ .+ 1f-10) # to be deleted
+get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)],
+                                                     [name for name in readdir(LR_path)]
+bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ 1f-10) -
+                          (1  .- y) .* log.(1 .- ŷ .+ 1f-10)  # SPRAWDZ!
 load_generator() = generator(blocks_count) |> gpu
 load_discriminator() = discriminator() |> gpu
-batchnorm_wrap() = Chain(x -> expand_dims(x, 2),
+wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
                          BatchNorm(out_ch),
                          x -> squeeze(x))
 normalize(x) = convert(CuArray{Float32}, 2.0 .* x .- 1.0)
@@ -32,11 +35,11 @@ denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0) ./ 2.0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
-optimize()
+optimizer = ADAM(η, (β1, β2))
 
 
 function load_vgg()
-    vgg = VGG19()  # Metalhead.jl
+    vgg = VGG19() |> gpu # Metalhead.jl
     vgg = Chain(vgg.layers[1:20]...)  # triple dots include Dropout, Dense, Softmax
     @info "VGG net loaded."
     vgg
