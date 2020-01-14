@@ -45,7 +45,7 @@ function _train_step(HR, LR)  # CHECK IT
 end
 
 
-function train(;prepare_dataset=false)
+function train(;prepare_dataset=false; smoke_run=false)
     current_time = now()
     @info "$current_time\nTraining process has started"
 
@@ -72,9 +72,9 @@ function train(;prepare_dataset=false)
     @info "Training process completed."
     generator = generator |> cpu  # super important to work on machines with no GPU
     @info "Saving model..."
-    @save "MODELS_PATH/final_model.jld2" generator
+    @save joinpath("$MODELS_PATH", "final_model.jld2") generator
     current_time = now()
     @info "$current_time\nModel saved at: $MODELS_PATH"
 end
 
-# train(prepare_dataset=true)
+train(prepare_dataset=true)
