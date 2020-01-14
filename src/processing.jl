@@ -46,6 +46,7 @@ function load_vgg()
 end
 
 
+# PRelu
 mutable struct PRelu{T}
     α::T
 end
@@ -64,6 +65,44 @@ function (m::PRelu)(x)
 		       length of α: $(length(m.α))\nnumber of channels: $(size(x)[end-1])")
 	end
 end
+
+
+# pixel shuffler
+function _partition_channels(x::AbstractArray, n::Int)
+	# see PR157 for model-zoo
+    indices = collect(1:size(x)[end - 1])
+    partitioned = partition(indices, div(size(x)[end-1], n))
+    partitions = []
+    for c in partitioned
+       c = [c_ for c_ in c]
+       push!(partitions, x[:, :, c, :])
+    end
+    partitions
+end
+
+function _phase_shift(x, r),
+	# https://arxiv.org/pdf/1609.05158.pdf
+    w, h, c, n = size(x)
+    x = reshape(x, W, H, r, r, N)
+    x = [x[i, :, :, :, :] for i in 1:w]
+    x = cat([t for t in x]..., dims=2)
+    x = [x[i,:,:,:] for i in 1:size(x)[1]]
+    x = cat([t for t in x]..., dims=2)
+    x
+end
+
+function shuffle_pixels(x, r=3)
+	dims_expected = 4
+	length(size(x)) == 4 ||
+		error("Dimensions mismatch.\nexpected: $dims_expected\ngot:$length(size(x))")
+	size(x)[end - 1] % (r^2) == 0 ||
+		error("Number of channels is not divisable by r^2")
+    c_out = div(size(x)[end-1], r^2)
+    p = _partition_channels(x, c_out)
+    out = cat([_phase_shift(c, r) for c in p]..., dims=3)
+    reshape(out, size(out)[1], size(out)[2], c_out, div(size(out)[end], c_out))
+end
+
 
 # networks definition
 function discriminator()
