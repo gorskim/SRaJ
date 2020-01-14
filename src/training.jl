@@ -19,7 +19,7 @@ SEED = 123
 GENERATOR_BLOCKS_COUNT = 16
 
 
-function get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
+function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
     HR_batch, LR_batch = [], []
     @info "Loading minibatch."
     @showprogress for (i, HR_name) in enumerate(HR_names)
@@ -33,9 +33,12 @@ function get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
 end
 
 
-function train_step(HR, LR)  # CHECK IT
+function _train_step(HR, LR)  # CHECK IT
     HR = normalize(HR)
+    # taking gradients with respect to the loss
+    # https://github.com/FluxML/Flux.jl/blob/master/docs/src/models/basics.md
     d_gs = Tracker.gradient(() -> dloss(HR, LR), params(discriminator))
+    # https://github.com/FluxML/Flux.jl/blob/master/docs/src/training/optimisers.md
     update!(optimizer, params(discriminator), d_gs)
     g_gs = Tracker.gradient(() -> gloss(HR, LR), params(generator))
     update!(optimizer, params(generator), g_gs)
@@ -61,15 +64,17 @@ function train(;prepare_dataset=false)
     @showprogress for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
-            HR, LR = get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-            weights = train_step(HR |> gpu, LR |> gpu)
+            HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
+            weights = _train_step(HR |> gpu, LR |> gpu)
         end
     end
 
-    model = model |> cpu  # super important!
-    @save "MODELS_PATH/final_model.jld2" model
+    @info "Training process completed."
+    generator = generator |> cpu  # super important to work on machines with no GPU
+    @info "Saving model..."
+    @save "MODELS_PATH/final_model.jld2" generator
     current_time = now()
-    @info "$current_time\nTraining process completed. The model saved at: $MODELS_PATH"
+    @info "$current_time\nModel saved at: $MODELS_PATH"
 end
 
 # train(prepare_dataset=true)
