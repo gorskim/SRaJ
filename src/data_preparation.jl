@@ -6,22 +6,23 @@ using CuArrays
 
 # constants definition
 TRAINING_DATASET_DIR = "data/dataset"
-LR_IMAGES = "data/prepared_dataset/LR"
-HR_IMAGES = "data/prepared_dataset/HR"
+LR_DIR = "data/prepared_dataset/LR"
+HR_DIR = "data/prepared_dataset/HR"
 PLAYGROUND_DIR = "data/test_data"  # testing = playing with new methods, etc.
-IMAGE_ZOOM = 0.25
-IMAGE_SIZE = 64  # e.g. 64 stands for 64x64 pixels (always square images)
+IMAGE_ZOOM = 3 ^ (-1)
+IMAGE_SIZE = Int(64)  # e.g. 64 stands for 64x64 pixels (always square images)
+LR_IMAGE_SIZE = Int(IMAGE_ZOOM * IMAGE_SIZE)
 
 
 """
-    crop_image(image, new_size)
+    _crop_image(image, new_size)
 
 Crop smaller images (square) out of an input one.
 
 # Examples
-crop_image(img, 64)
+_crop_image(img, 64)
 """
-function crop_image(image::Array, new_size::Int64)
+function _crop_image(image::Array, new_size::Int64)
     # get rid of the residual pixels
     new_height = height(image) - height(image) % new_size
     new_width = width(image) - width(image) % new_size
@@ -46,15 +47,15 @@ end
 
 
 """
-    prepare_test_data(test_images, dir)
+    _prepare_test_data(test_images, dir)
 
 Prepare images for testing, demonstration, etc. 'test_images' vector must
 contain names of the images available via TestImages package.
 
 # Examples
-prepare_test_data(TEST_IMAGES, "data/test_data")
+_prepare_test_data(TEST_IMAGES, "data/test_data")
 """
-function prepare_test_data(test_images::Vector{String}, dir::String)
+function _prepare_test_data(test_images::Vector{String}, dir::String)
     for image_name in test_images
         img = testimage(image_name)
         save("$dir/$image_name.png", img)
@@ -63,19 +64,19 @@ end
 
 
 """
-    prepare_data(dir, zoom, new_size)
+    _prepare_data(dir, zoom, new_size)
 
 Prepare data (images) in a given directory for the training process.
 
 # Examples
-prepare_data("data/dataset", "HR", "LR", 0.50, 64)
+_prepare_data("data/dataset", "HR", "LR", 0.50, 64)
 """
-function prepare_data(dir::String, HR_dir::String, LR_dir::String,
+function _prepare_data(dir::String, HR_dir::String, LR_dir::String,
 					  zoom::Float64, new_size::Int64)
     @info "Cropping, blurring, resizing, creating arrays:"
     @showprogress for img_file in readdir(dir)
         img = RGB.(load(joinpath(dir, img_file)))
-        cropped_images = crop_image(img, new_size)
+        cropped_images = _crop_image(img, new_size)
         i = 1
         for cropped in cropped_images
             i += 1
@@ -97,8 +98,7 @@ function prepare_data(dir::String, HR_dir::String, LR_dir::String,
 end
 
 
-
 function prepare_dataset()
-    prepare_data(TRAINING_DATASET_DIR, HR_IMAGES, LR_IMAGES, IMAGE_ZOOM, IMAGE_SIZE)
+    _prepare_data(TRAINING_DATASET_DIR, HR_DIR, LR_DIR, IMAGE_ZOOM, IMAGE_SIZE)
 	@info "Dataset prepared."
 end
