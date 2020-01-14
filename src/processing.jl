@@ -1,19 +1,12 @@
 using Flux, ImageQualityIndexes
 
-
-
 include("data_preparation.jl")
 
 global atype = gpu() >= 0 ? KnetArray{Float32} :  Array{Float32}
 const ε = Float32(1e-8)
-IMAGE_ZOOM = 0.25
-IMAGE_SIZE = 64  # e.g. 64 stands for 64x64 pixels (always square images)
 IMAGE_CHANNELS = 3
 EPOCHS = 10^4
-BATCH_SIZE = 100
-SEED = 123
-SAVE_FREQ = 100  # ?
-α = 0.2
+α = 0.2  # leakyReLU activation
 η = 10^(-4) # learning rate for optimizer (Adam)
 β1, β2 = 0.9, 0.999  # Adam parametetrs for bias corrected moments
 NOISE_DIM = 100
@@ -35,6 +28,7 @@ denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0) ./ 2.0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
+initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02), shape...))
 optimizer = ADAM(η, (β1, β2))
 
 # util functions and layers
@@ -104,9 +98,33 @@ function shuffle_pixels(x, r=3)
 end
 
 
-# networks definition
+# discriminator definition
+_dconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s,s);
+		  init=initialize_weights), x -> leakyrelu.(x, α))
+
+_dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s,s);
+		  init=initialize_weights), wrap_batchnorm(out_size)...,
+		  x -> leakyrelu.(x, α))
+
 function discriminator()
+	Chain(_dconv(3, 64, 3, 1, 1),
+		  _dconvBN(64, 64, 3, 2, 1),
+		  _dconvBN(64, 128, 3, 1, 1),
+		  _dconvBN(128, 128, 3, 2, 1),
+		  _dconvBN(128, 256, 3, 1, 1),
+		  _dconvBN(256, 256, 3, 2, 1),
+		  _dconvBN(256, 512, 3, 1, 1),
+		  _dconvBN(512, 512, 3, 2, 1),
+		  x -> flatten(x),
+		  Dense(16 * 16 * 512, 1024),
+		  x -> leakyrelu.(x, α),
+		  Dense(1024, 1),
+		  x -> σ.(x))
 end
+
+
 
 function generator()
 end
