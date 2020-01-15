@@ -1,4 +1,5 @@
 using Flux
+using Distributions
 
 include("data_preparation.jl")
 
@@ -8,6 +9,7 @@ include("data_preparation.jl")
 β1, β2 = 0.9, 0.999  # Adam parametetrs for bias corrected moments
 
 # one-liners
+
 load_image(filename) = Float32.(channelview(load(filename)))
 get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)],
                                                      [name for name in readdir(LR_path)]
@@ -123,7 +125,7 @@ end
 # generator definition
 _gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
 	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
-		  init=random_normal))
+		  init=initialize_weights))
 
 _gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
 	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
@@ -171,15 +173,15 @@ function Gen(blocks::Int)
 	end
 
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64,64), _gconv(1,3,9,1,1))
+	conv_blocks = (_gconvBN(64, 64), _gconv(1, 3, 9, 1, 1))
 	upsample_blocks = (_upsample_block(64, 256), _upsample_block(16, 256))
-	Generator(conv_initial, residual_blocks, conv_blocks, up_blocks)
+	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
 
 function (gen::Generator)(x)
 	@info "Generating..."
 	@info "Input: $(size(x))"
-	x = gen.conv_initial(x)
+	x = gen.conv_initial(x)  # DimensionMismatch("Rank of x and w must match! (3 vs. 4)"), check form of x
 	x_initial_conv = x
 
 	for residual_block in gen.residual_blocks
@@ -197,4 +199,29 @@ function (gen::Generator)(x)
 
 	x = gen.conv_blocks[2](x)
 	tanh.(x)
+end
+
+# losses definition
+function dloss(HR, LR, gen, dis)
+    SR = gen(LR).data
+    fake_prob = dis(SR)
+    fake_labels = zeros(size(fake_prob)...) |> gpu
+    fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
+    real_prob = dis(HR)
+    real_labels = ones(size(real_prob)...) |> gpu
+    real_dis_loss = bin_cross_entropy(real_prob, real_labels)
+    mean(fake_dis_loss .+ real_dis_loss)
+end
+
+function gloss(HR, LR, gen, dis)
+	SR = gen(LR)
+	fake_prob = dis(SR)
+	real_labels = ones(size(fake_prob)...) |> gpu
+	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
+
+	HR_features = vgg(HR).data
+	SR_features = vgg(SR)
+	content_loss = mean((HR_features .- SR_features) .^2)
+
+	loss_adv + 0.001f0 * content_loss
 end
