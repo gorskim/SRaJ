@@ -9,8 +9,9 @@ TRAINING_DATASET_DIR = "data/dataset"
 LR_DIR = "data/prepared_dataset/LR"
 HR_DIR = "data/prepared_dataset/HR"
 PLAYGROUND_DIR = "data/test_data"  # testing = playing with new methods, etc.
-IMAGE_ZOOM = 3 ^ (-1)
-IMAGE_SIZE = Int(64)  # e.g. 64 stands for 64x64 pixels (always square images)
+UP_FACTOR = 3
+IMAGE_ZOOM = UP_FACTOR ^ (-1)
+IMAGE_SIZE = 64  # e.g. 64 stands for 64x64 pixels (always square images)
 LR_IMAGE_SIZE = Int(IMAGE_ZOOM * IMAGE_SIZE)
 
 
@@ -87,14 +88,6 @@ function _prepare_data(dir::String, HR_dir::String, LR_dir::String,
             save(joinpath(LR_dir, "d$out_file"), downsampled)
         end
     end
-
-    # @info "Converting data to 4D array"
-    # LR_images = reshape(cat(LR_images..., dims=4),
-    #                     Int(new_size * zoom), Int(new_size * zoom), 3, length(LR_images))
-    # HR_images = reshape(cat(HR_images..., dims=4),
-    #                     Int(new_size), Int(new_size), 3, length(HR_images))
-	#
-    # LR_images, HR_images
 end
 
 
