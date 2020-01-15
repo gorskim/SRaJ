@@ -1,16 +1,11 @@
-using Flux, ImageQualityIndexes
+using Flux
 
 include("data_preparation.jl")
 
-global atype = gpu() >= 0 ? KnetArray{Float32} :  Array{Float32}
-const ε = Float32(1e-8)
-IMAGE_CHANNELS = 3
-EPOCHS = 10^4
+# constants
 α = 0.2  # leakyReLU activation
 η = 10^(-4) # learning rate for optimizer (Adam)
 β1, β2 = 0.9, 0.999  # Adam parametetrs for bias corrected moments
-NOISE_DIM = 100
-
 
 # one-liners
 load_image(filename) = Float32.(channelview(load(filename)))
@@ -40,16 +35,16 @@ function load_vgg()
 end
 
 
-# PRelu
-mutable struct PRelu{T}
+# PReLU
+mutable struct PReLU{T}
     α::T
 end
 
-@treelike PRelu
+@treelike PReLU
 
-PRelu(img_channels::Int; init=Flux.glorot_uniform) = PRelu(param(init(img_channels)))
+PReLU(img_channels::Int; init=Flux.glorot_uniform) = PReLU(param(init(img_channels)))
 
-function (m::PRelu)(x)
+function (m::PReLU)(x)
 	if size(x)[end - 1] == length(m.α)
 		return max.(0.0f0, x) .+
 			  (reshape(m.α, ones(Int64, length(size(x)) - 2)...,
@@ -74,7 +69,7 @@ function _partition_channels(x::AbstractArray, n::Int)
     partitions
 end
 
-function _phase_shift(x, r),
+function _phase_shift(x, r)
 	# https://arxiv.org/pdf/1609.05158.pdf
     w, h, c, n = size(x)
     x = reshape(x, W, H, r, r, N)
@@ -85,7 +80,7 @@ function _phase_shift(x, r),
     x
 end
 
-function shuffle_pixels(x, r=3)
+function _shuffle_pixels(x, r=3)
 	dims_expected = 4
 	length(size(x)) == 4 ||
 		error("Dimensions mismatch.\nexpected: $dims_expected\ngot:$length(size(x))")
@@ -108,7 +103,7 @@ _dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
 		  init=initialize_weights), wrap_batchnorm(out_size)...,
 		  x -> leakyrelu.(x, α))
 
-function discriminator()
+function Discriminator()
 	Chain(_dconv(3, 64, 3, 1, 1),
 		  _dconvBN(64, 64, 3, 2, 1),
 		  _dconvBN(64, 128, 3, 1, 1),
@@ -125,14 +120,81 @@ function discriminator()
 end
 
 
+# generator definition
+_gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
+		  init=random_normal))
 
-function generator()
+_gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
+		  init=initialize_weights), wrap_batchnorm(out_size)...)
+
+_conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
+		  init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
+
+mutable struct ResidualBlock
+	conv_blocks
 end
 
+@treelike ResidualBlock
 
-# losses definition
-function dloss()
+ResidualBlock() = ResidualBlock((_conv_block(), _conv_block()))
+
+function (m::ResidualBlock)(x)
+	out = m.conv_blocks[1](x)
+	out = m.conv_blocks[2](out)
+	out .+ x
 end
 
-function gloss()
+_upsample_block(in_size::Int, out_size::Int) =
+	Chain(_gconv(in_size, out_size, 3, 1, 1),
+		  x->_shuffle_pixels(x, UP_FACTOR),
+		  PReLU(div(out_size, UP_FACTOR * 2)))
+
+mutable struct Generator
+	conv_initial
+	residual_blocks
+	conv_blocks
+	upsample_blocks
+end
+
+@treelike Generator
+
+function Gen(blocks::Int)
+	@info "Number of blocks: $blocks"
+	conv_initial = Chain(_gconv(3, 64, 9, 1, 1), PReLU(64))
+
+	residual_blocks = []
+	for block in 1:blocks
+		push!(residual_blocks, ResidualBlock())
+	end
+
+	residual_blocks = tuple(residual_blocks...)
+	conv_blocks = (_gconvBN(64,64), _gconv(1,3,9,1,1))
+	upsample_blocks = (_upsample_block(64, 256), _upsample_block(16, 256))
+	Generator(conv_initial, residual_blocks, conv_blocks, up_blocks)
+end
+
+function (gen::Generator)(x)
+	@info "Generating..."
+	@info "Input: $(size(x))"
+	x = gen.conv_initial(x)
+	x_initial_conv = x
+
+	for residual_block in gen.residual_blocks
+		x = residual_block(x)
+	end
+
+	@info "Residual block: $(size(x))"
+	x = gen.conv_blocks[1](x)
+	x = x .+ x_initial_conv
+
+	@info "ResConv block : $(size(x))"
+	for upsample_block in gen.upsample_blocks
+		x = upsample_block(x)
+	end
+
+	x = gen.conv_blocks[2](x)
+	tanh.(x)
 end
