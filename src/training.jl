@@ -8,21 +8,23 @@ include("processing.jl")
 
 # constants and parameters definition
 MODELS_PATH = "models/"
-ε = Float32(1e-8)
 IMAGE_CHANNELS = 3
 EPOCHS = 5 * 10^4
 MINIBATCH_SIZE = 32  # 32 - 128
-SEED = 123
 NOISE_DIM = 128  # ? size vector to generate images from
 SAVE_FREQ = 100  # ? is it necessary?
 α = 0.2
-SEED = 123
 GENERATOR_BLOCKS_COUNT = 16
+CHECKPOINT_FREQUENCY = 2500
+
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
 SMOKE_MINIBATCH = 2
 SMOKE_EPOCHS = 10
 
+function _load_image(img_name::String)
+
+end
 
 function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
     HR_batch, LR_batch = [], []
@@ -38,15 +40,15 @@ function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
 end
 
 
-function _train_step(HR, LR)
+function _train_step(HR, LR, gen, dis)
     HR = normalize(HR)
     # taking gradients with respect to the loss
     # https://github.com/FluxML/Flux.jl/blob/master/docs/src/models/basics.md
-    d_gs = Tracker.gradient(() -> dloss(HR, LR), params(discriminator))
+    d_gs = Tracker.gradient(() -> dloss(HR, LR, gen, dis), params(dis))
     # https://github.com/FluxML/Flux.jl/blob/master/docs/src/training/optimisers.md
-    update!(optimizer, params(discriminator), d_gs)
-    g_gs = Tracker.gradient(() -> gloss(HR, LR), params(generator))
-    update!(optimizer, params(generator), g_gs)
+    update!(optimizer, params(dis), d_gs)
+    g_gs = Tracker.gradient(() -> gloss(HR, LR, gen, dis), params(gen))
+    update!(optimizer, params(gen), g_gs)
 end
 
 
@@ -54,13 +56,14 @@ function _save_weights(model, out_filename)
     @info "Saving model..."
     model = model |> cpu  # super important to work on machines with no GPU
     weights = params(model)
-    @save joinpath("$MODELS_PATH", out_filename) generator
+    @save joinpath("$MODELS_PATH", out_filename) weights
     current_time = now()
     @info "$current_time\nModel saved at: $MODELS_PATH"
 end
 
 
-function train(;prepare_dataset=false; smoke_run=false; checkpoint_frequency=2500)
+function train(;prepare_dataset=false, smoke_run=false,
+               checkpoint_frequency=CHECKPOINT_FREQUENCY)
     current_time = now()
     @info "$current_time\nTraining process has started"
 
@@ -84,22 +87,25 @@ function train(;prepare_dataset=false; smoke_run=false; checkpoint_frequency=250
     HR_batches, LR_batches = [HR_names[i] for i in minibatch_indices],
                              [LR_names[i] for i in minibatch_indices]
 
+    gen = Gen(GENERATOR_BLOCKS_COUNT) |> gpu
+    dis = Discriminator() |> gpu
+
     @showprogress for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
             HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-            weights = _train_step(HR |> gpu, LR |> gpu)
+            weights = _train_step(HR |> gpu, LR |> gpu, gen, dis)
             if epoch % checkpoint_frequency == 0
                 @info "CHECKPOINT!"
                 model_name = "model-$(now()).jld2"
-                _save_weights(generator, model_name)
+                _save_weights(gen, model_name)
             end
         end
     end
 
     @info "Training process completed."
-    _save_weights(generator, "final_model.jld2")
+    _save_weights(gen, "final_model.jld2")
 end
 
-train(prepare_dataset=true, smoke_run=true)
-# train()
+train(prepare_dataset=false, smoke_run=true)
+# train(prepare_dataset=true)
