@@ -1,5 +1,5 @@
-using Images, Colors, JLD2, ProgressMeter, ImageFiltering
-using TestImages: testimage
+using Images, Colors, JLD2, ImageFiltering
+using ProgressMeter: @showprogress
 using Random:shuffle! # for shuffle
 using Base.Iterators:partition
 using CuArrays
@@ -12,7 +12,7 @@ PLAYGROUND_DIR = "data/test_data"  # testing = playing with new methods, etc.
 UP_FACTOR = 3
 IMAGE_ZOOM = UP_FACTOR ^ (-1)
 IMAGE_SIZE = 64  # e.g. 64 stands for 64x64 pixels (always square images)
-LR_IMAGE_SIZE = Int(IMAGE_ZOOM * IMAGE_SIZE)
+LR_IMAGE_SIZE = Int(ceil(IMAGE_ZOOM * IMAGE_SIZE))
 
 
 """

@@ -1,19 +1,17 @@
-using Knet, JLD2, Dates, Metalhead
-using Flux.Tracker:update!
-using Flux: throttle
-
+using JLD2, Dates, Metalhead, Flux, Tracker
+using Tracker:update!
+using Flux:throttle, @treelike, params, param
 
 include("data_preparation.jl")
 include("processing.jl")
+
+@info "All the necessary libs imported."
 
 # constants and parameters definition
 MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
 EPOCHS = 5 * 10^4
 MINIBATCH_SIZE = 32  # 32 - 128
-NOISE_DIM = 128  # ? size vector to generate images from
-SAVE_FREQ = 100  # ? is it necessary?
-α = 0.2
 GENERATOR_BLOCKS_COUNT = 16
 CHECKPOINT_FREQUENCY = 2500
 
@@ -22,16 +20,12 @@ N_SMOKE_SAMPLES = 6
 SMOKE_MINIBATCH = 2
 SMOKE_EPOCHS = 10
 
-function _load_image(img_name::String)
-
-end
-
 function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
     HR_batch, LR_batch = [], []
     @info "Loading minibatch."
     @showprogress for (i, HR_name) in enumerate(HR_names)
-        push!(HR_batch, load_image(HR_name))
-        push!(LR_batch, load_image(LR_names[i]))
+        push!(HR_batch, load_image(joinpath(HR_DIR, HR_name)))
+        push!(LR_batch, load_image(joinpath(LR_DIR, LR_names[i])))
     end
     return reshape(cat(HR_batch..., dims=4), IMAGE_SIZE, IMAGE_SIZE,
                    IMAGE_CHANNELS, length(HR_batch)),

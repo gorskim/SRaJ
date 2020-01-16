@@ -14,15 +14,15 @@ load_image(filename) = Float32.(channelview(load(filename)))
 get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)],
                                                      [name for name in readdir(LR_path)]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ 1f-10) -
-                          (1  .- y) .* log.(1 .- ŷ .+ 1f-10)  # SPRAWDZ!
+                          (1  .- y) .* log.(1 .- ŷ .+ 1f-10)  # check
 load_generator() = generator(blocks_count) |> gpu
 load_discriminator() = discriminator() |> gpu
-wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
-                         BatchNorm(out_ch),
-                         x -> squeeze(x))
 normalize(x) = convert(CuArray{Float32}, 2.0 .* x .- 1.0)
 denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0) ./ 2.0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
+wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
+                         BatchNorm(out_ch),
+                         x -> squeeze_dims(x))
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02), shape...))
@@ -87,7 +87,7 @@ function _shuffle_pixels(x, r=3)
 	length(size(x)) == 4 ||
 		error("Dimensions mismatch.\nexpected: $dims_expected\ngot:$length(size(x))")
 	size(x)[end - 1] % (r^2) == 0 ||
-		error("Number of channels is not divisable by r^2")
+		error("Number of channels is not divisable by r^2")  # watch here
     c_out = div(size(x)[end-1], r^2)
     p = _partition_channels(x, c_out)
     out = cat([_phase_shift(c, r) for c in p]..., dims=3)
@@ -181,7 +181,7 @@ end
 function (gen::Generator)(x)
 	@info "Generating..."
 	@info "Input: $(size(x))"
-	x = gen.conv_initial(x)  # DimensionMismatch("Rank of x and w must match! (3 vs. 4)"), check form of x
+	x = gen.conv_initial(x)
 	x_initial_conv = x
 
 	for residual_block in gen.residual_blocks
@@ -214,6 +214,7 @@ function dloss(HR, LR, gen, dis)
 end
 
 function gloss(HR, LR, gen, dis)
+	vgg = load_vgg()
 	SR = gen(LR)
 	fake_prob = dis(SR)
 	real_labels = ones(size(fake_prob)...) |> gpu
