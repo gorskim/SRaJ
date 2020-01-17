@@ -74,7 +74,7 @@ end
 function _phase_shift(x, r)
 	# https://arxiv.org/pdf/1609.05158.pdf
     w, h, c, n = size(x)
-    x = reshape(x, W, H, r, r, N)
+    x = reshape(x, w, h, r, r, n)
     x = [x[i, :, :, :, :] for i in 1:w]
     x = cat([t for t in x]..., dims=2)
     x = [x[i,:,:,:] for i in 1:size(x)[1]]

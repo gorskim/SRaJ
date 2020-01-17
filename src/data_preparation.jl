@@ -9,11 +9,10 @@ TRAINING_DATASET_DIR = "data/dataset"
 LR_DIR = "data/prepared_dataset/LR"
 HR_DIR = "data/prepared_dataset/HR"
 PLAYGROUND_DIR = "data/test_data"  # testing = playing with new methods, etc.
-UP_FACTOR = 3
+UP_FACTOR = 4
 IMAGE_ZOOM = UP_FACTOR ^ (-1)
-IMAGE_SIZE = 64  # e.g. 64 stands for 64x64 pixels (always square images)
-LR_IMAGE_SIZE = Int(ceil(IMAGE_ZOOM * IMAGE_SIZE))
-
+IMAGE_SIZE = 128 # e.g. 64 stands for 64x64 pixels (always square images)
+LR_IMAGE_SIZE = Int(IMAGE_ZOOM * IMAGE_SIZE)
 
 """
     _crop_image(image, new_size)
