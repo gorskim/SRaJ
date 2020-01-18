@@ -3,6 +3,9 @@ using Distributions
 
 include("data_preparation.jl")
 
+CuArrays.allowscalar(false)
+@info "Scalar operations for CuArrays ale disabled."
+
 # constants
 α = 0.2  # leakyReLU activation
 η = 10^(-4) # learning rate for optimizer (Adam)
@@ -154,7 +157,7 @@ end
 _upsample_block(in_size::Int, out_size::Int) =
 	Chain(_gconv(in_size, out_size, 3, 1, 1),
 		  x->_shuffle_pixels(x, UP_FACTOR),
-		  PReLU(div(out_size, UP_FACTOR * 2)))
+		  PReLU(div(out_size, UP_FACTOR * 4)))
 
 mutable struct Generator
 	conv_initial
