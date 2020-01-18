@@ -46,8 +46,10 @@ end
 
 PReLU(img_channels::Int; init=Flux.glorot_uniform) = PReLU(param(init(img_channels)))
 
-function (m::PReLU)(x)
-	if size(x)[end - 1] == length(m.α)
+function (m::PReLU)(x)  # number of channels: 16
+	channels_count = size(x)[end - 1]
+	@info "Applying PReLU. Number of channels: $channels_count"
+	if channels_count == length(m.α)
 		return max.(0.0f0, x) .+
 			  (reshape(m.α, ones(Int64, length(size(x)) - 2)...,
 	                   length(m.α), 1) .* min.(0.0f0, x))
