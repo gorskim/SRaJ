@@ -99,6 +99,7 @@ function train(;prepare_dataset=false, smoke_run=false,
 
     @info "Training process completed."
     _save_weights(gen, "final_model.jld2")
+    @save joinpath("$MODELS_PATH", "losses.jld2") losses
 end
 
 train(prepare_dataset=false, smoke_run=true)

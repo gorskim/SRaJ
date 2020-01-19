@@ -204,6 +204,8 @@ function (gen::Generator)(x)
 end
 
 # losses definition
+losses = Dict("discriminator" => [], "generator" => [])
+
 function dloss(HR, LR, gen, dis)
     SR = gen(LR).data
     fake_prob = dis(SR)
@@ -212,7 +214,9 @@ function dloss(HR, LR, gen, dis)
     real_prob = dis(HR)
     real_labels = ones(size(real_prob)...) |> gpu
     real_dis_loss = bin_cross_entropy(real_prob, real_labels)
-    mean(fake_dis_loss .+ real_dis_loss)
+    output = mean(fake_dis_loss .+ real_dis_loss)
+	push!(losses["discriminator"], output)
+	output
 end
 
 function gloss(HR, LR, gen, dis)
@@ -226,5 +230,7 @@ function gloss(HR, LR, gen, dis)
 	SR_features = vgg(SR)
 	content_loss = mean((HR_features .- SR_features) .^2)
 
-	loss_adv + 0.001f0 * content_loss
+	output = loss_adv + 0.001f0 * content_loss
+	push!(losses["generator"], output)
+	output
 end
