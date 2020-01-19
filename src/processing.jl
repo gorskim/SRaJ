@@ -18,8 +18,6 @@ get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(H
                                                      [name for name in readdir(LR_path)]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ 1f-10) -
                           (1  .- y) .* log.(1 .- ŷ .+ 1f-10)  # check
-load_generator() = generator(blocks_count) |> gpu
-load_discriminator() = discriminator() |> gpu
 normalize(x) = convert(CuArray{Float32}, 2.0 .* x .- 1.0)
 denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0) ./ 2.0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
@@ -178,14 +176,14 @@ function Gen(blocks::Int)
 	end
 
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64, 64), _gconv(1, 3, 9, 1, 1))
+	conv_blocks = (_gconvBN(64, 64), _gconv(1, 3, 9, 1, 1))  # temp change conv_blocks = (_gconvBN(64, 64), _gconv(16, 3, 9, 1, 1))
 	upsample_blocks = (_upsample_block(64, 256), _upsample_block(16, 256))
 	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
 
 function (gen::Generator)(x)
 	@info "Generating..."
-	@info "Input: $(size(x))"
+	@info "Input: $(size(x))" # (32, 32, 3, 2)
 	x = gen.conv_initial(x)
 	x_initial_conv = x
 
@@ -193,15 +191,14 @@ function (gen::Generator)(x)
 		x = residual_block(x)
 	end
 
-	@info "Residual block: $(size(x))"
+	@info "Residual block: $(size(x))" # (26, 26, 64, 2)
 	x = gen.conv_blocks[1](x)
 	x = x .+ x_initial_conv
 
-	@info "ResConv block : $(size(x))"
+	@info "ResConv block : $(size(x))"  # (26, 26, 64, 2)
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
 	end
-
 	x = gen.conv_blocks[2](x)
 	tanh.(x)
 end
