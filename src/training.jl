@@ -12,7 +12,7 @@ MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
 EPOCHS = 5 * 10^4
 MINIBATCH_SIZE = 32  # 32 - 128
-GENERATOR_BLOCKS_COUNT = 16
+GENERATOR_BLOCKS_COUNT = 8  # PLAY WITH IT
 CHECKPOINT_FREQUENCY = 2500
 
 # smoke variables - to test if everything works fine

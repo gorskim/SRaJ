@@ -26,6 +26,16 @@ wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
                          x -> squeeze_dims(x))
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
+
+function flatten(x)
+	@info "flatten going on"
+	@info "$(size(x))"
+	out = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
+	@info "$(size(out))"
+	out
+end
+
+
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
 
@@ -47,7 +57,7 @@ end
 
 PReLU(img_channels::Int; init=Flux.glorot_uniform) = PReLU(param(init(img_channels)))
 
-function (m::PReLU)(x)  # number of channels: 16
+function (m::PReLU)(x)
 	channels_count = size(x)[end - 1]
 	@info "Applying PReLU. Number of channels: $channels_count"
 	if channels_count == length(m.α)
@@ -118,7 +128,7 @@ function Discriminator()
 		  _dconvBN(256, 512, 3, 1, 1),
 		  _dconvBN(512, 512, 3, 2, 1),
 		  x -> flatten(x),
-		  Dense(16 * 16 * 512, 1024),
+		  Dense(7 * 7 * 512, 1024),
 		  x -> leakyrelu.(x, α),
 		  Dense(1024, 1),
 		  x -> σ.(x))
@@ -145,17 +155,18 @@ end
 @treelike ResidualBlock
 
 ResidualBlock() = ResidualBlock((_conv_block(), _conv_block()))
+# ResidualBlock() = ResidualBlock((_conv_block(), _gconvBN(64, 64))) @ check it out
 
 function (m::ResidualBlock)(x)
-	out = m.conv_blocks[1](x)
-	out = m.conv_blocks[2](out)
+	res = m.conv_blocks[1](x)
+	out = m.conv_blocks[2](res)
 	out .+ x
 end
 
 _upsample_block(in_size::Int, out_size::Int) =
 	Chain(_gconv(in_size, out_size, 3, 1, 1),
-		  x->_shuffle_pixels(x, UP_FACTOR),
-		  PReLU(div(out_size, UP_FACTOR * 4)))
+		  x->_shuffle_pixels(x, 2),
+		  PReLU(div(out_size, UP_FACTOR)))
 
 mutable struct Generator
 	conv_initial
@@ -175,16 +186,17 @@ function Gen(blocks::Int)
 		push!(residual_blocks, ResidualBlock())
 	end
 
+
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64, 64), _gconv(1, 3, 9, 1, 1))  # temp change conv_blocks = (_gconvBN(64, 64), _gconv(16, 3, 9, 1, 1))
-	upsample_blocks = (_upsample_block(64, 256), _upsample_block(16, 256))
+	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1, 1))
+	upsample_blocks = (_upsample_block(64, 256), _upsample_block(64, 256))
 	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
 
 function (gen::Generator)(x)
 	@info "Generating..."
 	@info "Input: $(size(x))" # (32, 32, 3, 2)
-	x = gen.conv_initial(x)
+	x = gen.conv_initial(x) # (26, 26, 64, 2)
 	x_initial_conv = x
 
 	for residual_block in gen.residual_blocks
@@ -199,15 +211,18 @@ function (gen::Generator)(x)
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
 	end
+
+	# (104, 104, 64, 2)
 	x = gen.conv_blocks[2](x)
-	tanh.(x)
+	# (98, 98, 3, 2)
+	tanh.(x)  # (98, 98, 3, 2)
 end
 
 # losses definition
 losses = Dict("discriminator" => [], "generator" => [])
 
 function dloss(HR, LR, gen, dis)
-    SR = gen(LR).data
+    SR = gen(LR)
     fake_prob = dis(SR)
     fake_labels = zeros(size(fake_prob)...) |> gpu
     fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
@@ -226,9 +241,10 @@ function gloss(HR, LR, gen, dis)
 	real_labels = ones(size(fake_prob)...) |> gpu
 	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
 
+	# comment out vgg veature map ?
 	HR_features = vgg(HR).data
 	SR_features = vgg(SR)
-	content_loss = mean((HR_features .- SR_features) .^2)
+	content_loss = mean(((HR_features .- SR_features) ./ 12.75) .^2)
 
 	output = loss_adv + 0.001f0 * content_loss
 	push!(losses["generator"], output)
