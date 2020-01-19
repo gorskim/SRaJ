@@ -7,9 +7,9 @@ CuArrays.allowscalar(false)
 @info "Scalar operations for CuArrays ale disabled."
 
 # constants
-α = 0.2  # leakyReLU activation
+α = 0.2f0  # leakyReLU activation
 η = 10^(-4) # learning rate for optimizer (Adam)
-β1, β2 = 0.9, 0.999  # Adam parametetrs for bias corrected moments
+β1, β2 = 0.9f0, 0.999f0  # Adam parametetrs for bias corrected moments
 
 # one-liners
 
@@ -18,15 +18,15 @@ get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(H
                                                      [name for name in readdir(LR_path)]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ 1f-10) -
                           (1  .- y) .* log.(1 .- ŷ .+ 1f-10)  # check
-normalize(x) = convert(CuArray{Float32}, 2.0 .* x .- 1.0)
-denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0) ./ 2.0))
+normalize(x) = convert(CuArray{Float32}, 2.0f0 .* x .- 1.0f0)
+denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0f0) ./ 2.0f0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
 wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
                          BatchNorm(out_ch),
                          x -> squeeze_dims(x))
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
-initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02), shape...))
+initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
 
 # util functions and layers
