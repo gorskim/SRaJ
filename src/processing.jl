@@ -27,6 +27,7 @@ wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
 
+
 function flatten(x)
 	@info "flatten going on"
 	@info "$(size(x))"
@@ -35,6 +36,10 @@ function flatten(x)
 	out
 end
 
+function same_padding(in_size::Int, k::Int, s::Int)
+	p = Int(0.5 * ((in_size) - 1) * s + k - in_size)
+	(p, p)
+end
 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
@@ -109,24 +114,24 @@ end
 
 
 # discriminator definition
-_dconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s,s);
+_dconv(in_size::Int, out_size::Int, k=3, s=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s), stride=(s,s);
 		  init=initialize_weights), x -> leakyrelu.(x, α))
 
-_dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s,s);
+_dconvBN(in_size::Int, out_size::Int, k=3, s=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s), stride=(s,s);
 		  init=initialize_weights), wrap_batchnorm(out_size)...,
 		  x -> leakyrelu.(x, α))
 
 function Discriminator()
-	Chain(_dconv(3, 64, 3, 1, 1),
-		  _dconvBN(64, 64, 3, 2, 1),
-		  _dconvBN(64, 128, 3, 1, 1),
-		  _dconvBN(128, 128, 3, 2, 1),
-		  _dconvBN(128, 256, 3, 1, 1),
-		  _dconvBN(256, 256, 3, 2, 1),
-		  _dconvBN(256, 512, 3, 1, 1),
-		  _dconvBN(512, 512, 3, 2, 1),
+	Chain(_dconv(3, 64, 3, 1),
+		  _dconvBN(64, 64, 3, 2),
+		  _dconvBN(64, 128, 3, 1),
+		  _dconvBN(128, 128, 3, 2),
+		  _dconvBN(128, 256, 3, 1),
+		  _dconvBN(256, 256, 3, 2),
+		  _dconvBN(256, 512, 3, 1),
+		  _dconvBN(512, 512, 3, 2),
 		  x -> flatten(x),
 		  Dense(7 * 7 * 512, 1024),
 		  x -> leakyrelu.(x, α),
@@ -136,16 +141,16 @@ end
 
 
 # generator definition
-_gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
+_gconv(in_size::Int, out_size::Int, k=3, s=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s), stride=(s, s);
 		  init=initialize_weights))
 
-_gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
+_gconvBN(in_size::Int, out_size::Int, k=3, s=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s),, stride=(s, s);
 		  init=initialize_weights), wrap_batchnorm(out_size)...)
 
-_conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=(p, p), stride=(s, s);
+_conv_block(in_size=64, out_size=64, k=3, s=1) =
+	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s),, stride=(s, s);
 		  init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
 
 mutable struct ResidualBlock
@@ -164,7 +169,7 @@ function (m::ResidualBlock)(x)
 end
 
 _upsample_block(in_size::Int, out_size::Int) =
-	Chain(_gconv(in_size, out_size, 3, 1, 1),
+	Chain(_gconv(in_size, out_size, 3, 1),
 		  x->_shuffle_pixels(x, 2),
 		  PReLU(div(out_size, UP_FACTOR)))
 
@@ -179,7 +184,7 @@ end
 
 function Gen(blocks::Int)
 	@info "Number of blocks: $blocks"
-	conv_initial = Chain(_gconv(3, 64, 9, 1, 1), PReLU(64))
+	conv_initial = Chain(_gconv(3, 64, 9, 1), PReLU(64))
 
 	residual_blocks = []
 	for block in 1:blocks
@@ -188,7 +193,7 @@ function Gen(blocks::Int)
 
 
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1, 1))
+	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1))
 	upsample_blocks = (_upsample_block(64, 256), _upsample_block(64, 256))
 	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
