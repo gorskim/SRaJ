@@ -147,7 +147,7 @@ _gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
 		  init=initialize_weights), wrap_batchnorm(out_size)...)
 
 _conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p. p);
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p);
 		  init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
 
 mutable struct ResidualBlock
