@@ -26,6 +26,7 @@ wrap_batchnorm(out_ch) = Chain(x -> expand_dims(x, 2),
                          x -> squeeze_dims(x))
 expand_dims(x, n::Int) = reshape(x, ones(Int64, n)..., size(x)...)
 flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
+same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - in_size)
 
 
 function flatten(x)
@@ -36,10 +37,6 @@ function flatten(x)
 	out
 end
 
-function same_padding(in_size::Int, k::Int, s::Int)
-	p = Int(0.5 * ((in_size) - 1) * s + k - in_size)
-	(p, p)
-end
 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
@@ -114,12 +111,12 @@ end
 
 
 # discriminator definition
-_dconv(in_size::Int, out_size::Int, k=3, s=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s), stride=(s,s);
+_dconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p);
 		  init=initialize_weights), x -> leakyrelu.(x, α))
 
-_dconvBN(in_size::Int, out_size::Int, k=3, s=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s), stride=(s,s);
+_dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p);
 		  init=initialize_weights), wrap_batchnorm(out_size)...,
 		  x -> leakyrelu.(x, α))
 
@@ -141,16 +138,16 @@ end
 
 
 # generator definition
-_gconv(in_size::Int, out_size::Int, k=3, s=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s), stride=(s, s);
+_gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p);
 		  init=initialize_weights))
 
-_gconvBN(in_size::Int, out_size::Int, k=3, s=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s),, stride=(s, s);
+_gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p);
 		  init=initialize_weights), wrap_batchnorm(out_size)...)
 
-_conv_block(in_size=64, out_size=64, k=3, s=1) =
-	Chain(Conv((k, k), in_size=>out_size, pad=same_padding(in_size, k, s),, stride=(s, s);
+_conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p. p);
 		  init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
 
 mutable struct ResidualBlock
@@ -160,7 +157,7 @@ end
 @treelike ResidualBlock
 
 ResidualBlock() = ResidualBlock((_conv_block(), _conv_block()))
-# ResidualBlock() = ResidualBlock((_conv_block(), _gconvBN(64, 64))) @ check it out
+# ResidualBlock() = ResidualBlock((_conv_bl ock(), _gconvBN(64, 64))) @ check it out
 
 function (m::ResidualBlock)(x)
 	res = m.conv_blocks[1](x)
@@ -184,7 +181,7 @@ end
 
 function Gen(blocks::Int)
 	@info "Number of blocks: $blocks"
-	conv_initial = Chain(_gconv(3, 64, 9, 1), PReLU(64))
+	conv_initial = Chain(_gconv(3, 64, 9, 1, 4), PReLU(64))
 
 	residual_blocks = []
 	for block in 1:blocks
@@ -193,7 +190,7 @@ function Gen(blocks::Int)
 
 
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1))
+	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1, 4))
 	upsample_blocks = (_upsample_block(64, 256), _upsample_block(64, 256))
 	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
