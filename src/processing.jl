@@ -156,8 +156,7 @@ end
 
 @treelike ResidualBlock
 
-ResidualBlock() = ResidualBlock((_conv_block(), _conv_block()))
-# ResidualBlock() = ResidualBlock((_conv_bl ock(), _gconvBN(64, 64))) @ check it out
+ResidualBlock() = ResidualBlock((_conv_block(), _gconvBN(64, 64)))
 
 function (m::ResidualBlock)(x)
 	res = m.conv_blocks[1](x)
