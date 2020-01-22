@@ -130,7 +130,7 @@ function Discriminator()
 		  _dconvBN(256, 512, 3, 1),
 		  _dconvBN(512, 512, 3, 2),
 		  x -> flatten(x),
-		  Dense(7 * 7 * 512, 1024),
+		  Dense(8 * 8 * 512, 1024),
 		  x -> leakyrelu.(x, α),
 		  Dense(1024, 1),
 		  x -> σ.(x))
