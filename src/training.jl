@@ -88,7 +88,7 @@ function train(;prepare_dataset=false, smoke_run=false,
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
             HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-            weights = _train_step(HR |> gpu, LR |> gpu, gen, dis)
+            _train_step(HR |> gpu, LR |> gpu, gen, dis)
             if epoch % checkpoint_frequency == 0
                 @info "CHECKPOINT!"
                 model_name = "model-$(now()).jld2"

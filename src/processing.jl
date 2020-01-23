@@ -243,7 +243,7 @@ function gloss(HR, LR, gen, dis)
 	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
 
 	# comment out vgg veature map ?
-	HR_features = vgg(HR).data
+	HR_features = vgg(HR)
 	SR_features = vgg(SR)
 	content_loss = mean(((HR_features .- SR_features) ./ 12.75) .^2)
 
