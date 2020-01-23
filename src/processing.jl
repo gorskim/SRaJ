@@ -10,14 +10,15 @@ CuArrays.allowscalar(false)
 α = 0.2f0  # leakyReLU activation
 η = 10^(-4) # learning rate for optimizer (Adam)
 β1, β2 = 0.9f0, 0.999f0  # Adam parametetrs for bias corrected moments
+ϵ = 10f-10
 
 # one-liners
 
 load_image(filename) = Float32.(channelview(load(filename)))
 get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)],
                                                      [name for name in readdir(LR_path)]
-bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ 1f-10) -
-                          (1  .- y) .* log.(1 .- ŷ .+ 1f-10)  # check
+bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ ϵ) -
+                          (1 .- y) .* log.(1 .- ŷ .+ ϵ)
 normalize(x) = convert(CuArray{Float32}, 2.0f0 .* x .- 1.0f0)
 denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0f0) ./ 2.0f0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
