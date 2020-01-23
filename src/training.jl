@@ -20,6 +20,44 @@ N_SMOKE_SAMPLES = 6
 SMOKE_MINIBATCH = 2
 SMOKE_EPOCHS = 10
 
+gen = Gen(GENERATOR_BLOCKS_COUNT) |> gpu
+dis = Discriminator() |> gpu
+
+
+# losses definition
+losses = Dict("discriminator" => [], "generator" => [])
+
+function dloss(HR, LR)
+    SR = gen(LR)
+    fake_prob = dis(SR)
+    fake_labels = zeros(size(fake_prob)...) |> gpu
+    fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
+    real_prob = dis(HR)
+    real_labels = ones(size(real_prob)...) |> gpu
+    real_dis_loss = bin_cross_entropy(real_prob, real_labels)
+    output = mean(fake_dis_loss .+ real_dis_loss)
+	push!(losses["discriminator"], output)
+	output
+end
+
+function gloss(HR, LR)
+	vgg = load_vgg()
+	SR = gen(LR)
+	fake_prob = dis(SR)
+	real_labels = ones(size(fake_prob)...) |> gpu
+	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
+
+	# comment out vgg veature map ?
+	HR_features = vgg(HR)
+	SR_features = vgg(SR)
+	content_loss = mean(((HR_features .- SR_features) ./ 12.75) .^2)
+
+	output = loss_adv + 0.001f0 * content_loss
+	push!(losses["generator"], output)
+	output
+end
+
+
 function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
     HR_batch, LR_batch = [], []
     @info "Loading minibatch."
@@ -34,14 +72,11 @@ function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
 end
 
 
-function _train_step(HR, LR, gen, dis)
+function _train_step(HR, LR)
     HR = normalize(HR)
-    # taking gradients with respect to the loss
-    # https://github.com/FluxML/Flux.jl/blob/master/docs/src/models/basics.md
-    d_gs = Tracker.gradient(() -> dloss(HR, LR, gen, dis), params(dis))
-    # https://github.com/FluxML/Flux.jl/blob/master/docs/src/training/optimisers.md
+    d_gs = Tracker.gradient(() -> dloss(HR, LR), params(dis))
     update!(optimizer, params(dis), d_gs)
-    g_gs = Tracker.gradient(() -> gloss(HR, LR, gen, dis), params(gen))
+    g_gs = Tracker.gradient(() -> gloss(HR, LR), params(gen))
     update!(optimizer, params(gen), g_gs)
 end
 
@@ -80,9 +115,6 @@ function train(;prepare_dataset=false, smoke_run=false,
                                   MINIBATCH_SIZE)
     HR_batches, LR_batches = [HR_names[i] for i in minibatch_indices],
                              [LR_names[i] for i in minibatch_indices]
-
-    gen = Gen(GENERATOR_BLOCKS_COUNT) |> gpu
-    dis = Discriminator() |> gpu
 
     @showprogress for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"

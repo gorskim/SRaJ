@@ -219,36 +219,3 @@ function (gen::Generator)(x)
 	# (98, 98, 3, 2)
 	tanh.(x)  # (98, 98, 3, 2)
 end
-
-# losses definition
-losses = Dict("discriminator" => [], "generator" => [])
-
-function dloss(HR, LR, gen, dis)
-    SR = gen(LR)
-    fake_prob = dis(SR)
-    fake_labels = zeros(size(fake_prob)...) |> gpu
-    fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
-    real_prob = dis(HR)
-    real_labels = ones(size(real_prob)...) |> gpu
-    real_dis_loss = bin_cross_entropy(real_prob, real_labels)
-    output = mean(fake_dis_loss .+ real_dis_loss)
-	push!(losses["discriminator"], output)
-	output
-end
-
-function gloss(HR, LR, gen, dis)
-	vgg = load_vgg()
-	SR = gen(LR)
-	fake_prob = dis(SR)
-	real_labels = ones(size(fake_prob)...) |> gpu
-	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
-
-	# comment out vgg veature map ?
-	HR_features = vgg(HR)
-	SR_features = vgg(SR)
-	content_loss = mean(((HR_features .- SR_features) ./ 12.75) .^2)
-
-	output = loss_adv + 0.001f0 * content_loss
-	push!(losses["generator"], output)
-	output
-end
