@@ -1,6 +1,7 @@
-using JLD2, Dates, Metalhead, Flux, Tracker
+using Dates, Metalhead, Flux, Tracker
+using BSON: @save
 using Tracker:update!
-using Flux:throttle, @treelike, params, param
+using Flux: @treelike, params 
 
 include("data_preparation.jl")
 include("processing.jl")
@@ -12,8 +13,8 @@ MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
 EPOCHS = 5 * 10^4
 MINIBATCH_SIZE = 32  # 32 - 128
-GENERATOR_BLOCKS_COUNT = 8  # PLAY WITH IT
-CHECKPOINT_FREQUENCY = 2500
+GENERATOR_BLOCKS_COUNT = 16  # PLAY WITH IT
+CHECKPOINT_FREQUENCY = 2
 
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
@@ -22,7 +23,7 @@ SMOKE_EPOCHS = 10
 
 gen = Gen(GENERATOR_BLOCKS_COUNT) |> gpu
 dis = Discriminator() |> gpu
-
+vgg = load_vgg()
 
 # losses definition
 losses = Dict("discriminator" => [], "generator" => [])
@@ -41,17 +42,13 @@ function dloss(HR, LR)
 end
 
 function gloss(HR, LR)
-	vgg = load_vgg()
 	SR = gen(LR)
 	fake_prob = dis(SR)
 	real_labels = ones(size(fake_prob)...) |> gpu
 	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
-
-	# comment out vgg veature map ?
 	HR_features = vgg(HR)
 	SR_features = vgg(SR)
-	content_loss = mean(((HR_features .- SR_features) ./ 12.75) .^2)
-
+	content_loss = mean(((HR_features .- SR_features) ./ 12.75f0) .^2)
 	output = loss_adv + 0.001f0 * content_loss
 	push!(losses["generator"], output)
 	output
@@ -81,11 +78,10 @@ function _train_step(HR, LR)
 end
 
 
-function _save_weights(model, out_filename)
+function _save_model(model, out_filename)
     @info "Saving model..."
     model = model |> cpu  # super important to work on machines with no GPU
-    weights = params(model)
-    @save joinpath("$MODELS_PATH", out_filename) weights
+    @save joinpath(MODELS_PATH, out_filename) model
     current_time = now()
     @info "$current_time\nModel saved at: $MODELS_PATH"
 end
@@ -120,18 +116,18 @@ function train(;prepare_dataset=false, smoke_run=false,
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
             HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-            _train_step(HR |> gpu, LR |> gpu, gen, dis)
+            _train_step(HR |> gpu, LR |> gpu)
             if epoch % checkpoint_frequency == 0
                 @info "CHECKPOINT!"
-                model_name = "model-$(now()).jld2"
-                _save_weights(gen, model_name)
+                model_name = "model$(epoch).bson"
+                _save_model(gen, model_name)
             end
         end
     end
 
     @info "Training process completed."
-    _save_weights(gen, "final_model.jld2")
-    @save joinpath("$MODELS_PATH", "losses.jld2") losses
+    _save_model(gen, "final_model.bson")
+    @save joinpath(MODELS_PATH, "losses.bson") losses
 end
 
 train(prepare_dataset=false, smoke_run=true)
