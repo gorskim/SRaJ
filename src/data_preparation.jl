@@ -1,4 +1,4 @@
-using Images, Colors, JLD2, ImageFiltering
+using Images, Colors, ImageFiltering
 using ProgressMeter: @showprogress
 using Random:shuffle! # for shuffle
 using Base.Iterators:partition
