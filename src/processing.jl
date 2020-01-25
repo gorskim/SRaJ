@@ -1,5 +1,6 @@
 using Flux
 using Distributions
+using NNlib: leakyrelu
 
 include("data_preparation.jl")
 
@@ -30,15 +31,6 @@ flatten(x) = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
 same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - in_size)
 
 
-function flatten(x)
-	@info "flatten going on"
-	@info "$(size(x))"
-	out = reshape(x, prod(size(x)[1:end-1]), size(x)[end])
-	@info "$(size(out))"
-	out
-end
-
-
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
 
@@ -62,7 +54,6 @@ PReLU(img_channels::Int; init=Flux.glorot_uniform) = PReLU(param(init(img_channe
 
 function (m::PReLU)(x)
 	channels_count = size(x)[end - 1]
-	@info "Applying PReLU. Number of channels: $channels_count"
 	if channels_count == length(m.α)
 		return max.(0.0f0, x) .+
 			  (reshape(m.α, ones(Int64, length(size(x)) - 2)...,
@@ -180,14 +171,12 @@ end
 @treelike Generator
 
 function Gen(blocks::Int)
-	@info "Number of blocks: $blocks"
 	conv_initial = Chain(_gconv(3, 64, 9, 1, 4), PReLU(64))
 
 	residual_blocks = []
 	for block in 1:blocks
 		push!(residual_blocks, ResidualBlock())
 	end
-
 
 	residual_blocks = tuple(residual_blocks...)
 	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1, 4))
@@ -196,26 +185,19 @@ function Gen(blocks::Int)
 end
 
 function (gen::Generator)(x)
-	@info "Generating..."
-	@info "Input: $(size(x))" # (32, 32, 3, 2)
-	x = gen.conv_initial(x) # (26, 26, 64, 2)
+	x = gen.conv_initial(x) 
 	x_initial_conv = x
 
 	for residual_block in gen.residual_blocks
 		x = residual_block(x)
 	end
 
-	@info "Residual block: $(size(x))" # (26, 26, 64, 2)
 	x = gen.conv_blocks[1](x)
 	x = x .+ x_initial_conv
 
-	@info "ResConv block : $(size(x))"  # (26, 26, 64, 2)
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
 	end
-
-	# (104, 104, 64, 2)
 	x = gen.conv_blocks[2](x)
-	# (98, 98, 3, 2)
-	tanh.(x)  # (98, 98, 3, 2)
+	tanh.(x)
 end
