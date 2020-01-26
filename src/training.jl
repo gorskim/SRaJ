@@ -1,7 +1,7 @@
 using Dates, Metalhead, Flux, Tracker
 using BSON: @save
 using Tracker:update!
-using Flux: @treelike, params
+using Flux: @treelike, param, params
 
 include("data_preparation.jl")
 include("processing.jl")
