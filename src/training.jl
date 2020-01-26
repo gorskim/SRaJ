@@ -117,17 +117,19 @@ function train(;prepare_dataset=false, smoke_run=false,
         for batch_num in 1:length(HR_batches)
             HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
             _train_step(HR |> gpu, LR |> gpu)
-            if epoch % checkpoint_frequency == 0
-                @info "CHECKPOINT!"
-                model_name = "model$(epoch).bson"
-                _save_model(gen, model_name)
-            end
+        end
+        if epoch % checkpoint_frequency == 0
+            @info "CHECKPOINT!"
+            model_name = "model$(epoch).bson"
+            _save_model(gen, model_name)
         end
     end
 
     @info "Training process completed."
     _save_model(gen, "final_model.bson")
+    @info "Saving losses..."
     @save joinpath(MODELS_PATH, "losses.bson") losses
+    @info "COMPLETED"
 end
 
 train(prepare_dataset=false, smoke_run=true)
