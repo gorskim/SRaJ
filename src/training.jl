@@ -122,6 +122,7 @@ function train(;prepare_dataset=false, smoke_run=false,
             @info "CHECKPOINT!"
             model_name = "model$(epoch).bson"
             _save_model(gen, model_name)
+			@save joinpath(MODELS_PATH, "losses$(epoch).bson") losses
         end
     end
 
