@@ -1,7 +1,7 @@
 using Dates, Metalhead, Flux, Tracker
 using BSON: @save
 using Tracker:update!
-using Flux: @treelike, params 
+using Flux: @treelike, params
 
 include("data_preparation.jl")
 include("processing.jl")
@@ -13,7 +13,7 @@ MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
 EPOCHS = 5 * 10^4
 MINIBATCH_SIZE = 32  # 32 - 128
-GENERATOR_BLOCKS_COUNT = 16  # PLAY WITH IT
+GENERATOR_BLOCKS_COUNT = 16
 CHECKPOINT_FREQUENCY = 2
 
 # smoke variables - to test if everything works fine
@@ -48,8 +48,8 @@ function gloss(HR, LR)
 	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
 	HR_features = vgg(HR)
 	SR_features = vgg(SR)
-	content_loss = mean(((HR_features .- SR_features) ./ 12.75f0) .^2)
-	output = loss_adv + 0.001f0 * content_loss
+	content_loss = mean(((HR_features .- SR_features)) .^2)
+	output = loss_adv + 0.01f0 * content_loss
 	push!(losses["generator"], output)
 	output
 end

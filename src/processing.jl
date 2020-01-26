@@ -94,7 +94,7 @@ function _shuffle_pixels(x, r=3)
 	length(size(x)) == 4 ||
 		error("Dimensions mismatch.\nexpected: $dims_expected\ngot:$length(size(x))")
 	size(x)[end - 1] % (r^2) == 0 ||
-		error("Number of channels is not divisable by r^2")  # watch here
+		error("Number of channels is not divisable by r^2")
     c_out = div(size(x)[end-1], r^2)
     p = _partition_channels(x, c_out)
     out = cat([_phase_shift(c, r) for c in p]..., dims=3)
@@ -185,7 +185,7 @@ function Gen(blocks::Int)
 end
 
 function (gen::Generator)(x)
-	x = gen.conv_initial(x) 
+	x = gen.conv_initial(x)
 	x_initial_conv = x
 
 	for residual_block in gen.residual_blocks
