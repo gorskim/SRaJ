@@ -74,13 +74,15 @@ _prepare_data("data/dataset", "HR", "LR", 0.50, 64)
 function _prepare_data(dir::String, HR_dir::String, LR_dir::String,
 					  zoom::Float64, new_size::Int64)
     @info "Cropping, blurring, resizing, creating arrays:"
+	img_num = 0
     @showprogress for img_file in readdir(dir)
+		img_num += 1
         img = RGB.(load(joinpath(dir, img_file)))
         cropped_images = _crop_image(img, new_size)
-        i = 1
+        i = 0
         for cropped in cropped_images
             i += 1
-			out_file = "$i.png"
+			out_file = "$(img_num)-$i.png"
             save(joinpath(HR_dir, out_file), cropped)
             blurred = imfilter(cropped, Kernel.gaussian(3))
             downsampled = imresize(blurred, ratio=zoom)
