@@ -11,10 +11,10 @@ include("processing.jl")
 # constants and parameters definition
 MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
-EPOCHS = 5 * 10^4
+EPOCHS = 5000
 MINIBATCH_SIZE = 32  # 32 - 128
 GENERATOR_BLOCKS_COUNT = 16
-CHECKPOINT_FREQUENCY = 2
+CHECKPOINT_FREQUENCY = 50
 
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
