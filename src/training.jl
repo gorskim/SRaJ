@@ -48,7 +48,7 @@ function gloss(HR, LR)
 	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
 	HR_features = vgg(HR)
 	SR_features = vgg(SR)
-	content_loss = mean(((HR_features .- SR_features)) .^2) ./ 12.75
+	content_loss = mean(((HR_features .- SR_features)) .^2) ./ 12.75f0
 	output = 10f-3 * loss_adv + content_loss
 	push!(losses["generator"], output)
 	output
