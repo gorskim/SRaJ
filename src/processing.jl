@@ -15,7 +15,7 @@ CuArrays.allowscalar(false)
 
 # one-liners
 
-load_image(filename) = Float32.(channelview(load(filename)))
+load_image(filename) = Float32.(channelview(RGB.(load(filename))))
 get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)],
                                                      [name for name in readdir(LR_path)]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ ϵ) -
