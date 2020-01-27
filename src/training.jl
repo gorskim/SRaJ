@@ -133,5 +133,4 @@ function train(;prepare_dataset=false, smoke_run=false,
     @info "COMPLETED"
 end
 
-train(prepare_dataset=false, smoke_run=true)
-# train(prepare_dataset=true)
+train(prepare_dataset=false, smoke_run=false)
