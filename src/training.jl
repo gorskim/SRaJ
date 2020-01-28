@@ -12,9 +12,9 @@ include("processing.jl")
 MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
 EPOCHS = 5000
-MINIBATCH_SIZE = 60  # 32 - 128
-GENERATOR_BLOCKS_COUNT = 16
-CHECKPOINT_FREQUENCY = 50
+MINIBATCH_SIZE = 128  # 32 - 128
+GENERATOR_BLOCKS_COUNT = 8
+CHECKPOINT_FREQUENCY = 2
 
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
@@ -57,7 +57,7 @@ end
 
 function _get_minibatch(HR_names::Vector{String}, LR_names::Vector{String})
     HR_batch, LR_batch = [], []
-    @info "Loading minibatch."
+    # @info "Loading minibatch."
     for (i, HR_name) in enumerate(HR_names)
         push!(HR_batch, load_image(joinpath(HR_DIR, HR_name)))
         push!(LR_batch, load_image(joinpath(LR_DIR, LR_names[i])))
@@ -123,7 +123,9 @@ function train(;prepare_dataset=false, smoke_run=false,
     @showprogress for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
+            @info "Batch nr $batch_num - loading"
             HR, LR = HRdata[batch_num], LRdata[batch_num]
+            @info "Training..."
             _train_step(HR |> gpu, LR |> gpu)
         end
         if epoch % checkpoint_frequency == 0
@@ -141,4 +143,4 @@ function train(;prepare_dataset=false, smoke_run=false,
     @info "COMPLETED"
 end
 
-train(prepare_dataset=false, smoke_run=false)
+train(prepare_dataset=false, smoke_run=true)

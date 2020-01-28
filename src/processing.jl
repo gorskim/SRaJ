@@ -104,43 +104,38 @@ end
 
 # discriminator definition
 _dconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p);
-		  init=initialize_weights), x -> leakyrelu.(x, α))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p)), x -> leakyrelu.(x, α))
 
 _dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p);
-		  init=initialize_weights), wrap_batchnorm(out_size)...,
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p)), wrap_batchnorm(out_size)...,
 		  x -> leakyrelu.(x, α))
 
 function Discriminator()
 	Chain(_dconv(3, 64, 3, 1),
 		  _dconvBN(64, 64, 3, 2),
 		  _dconvBN(64, 128, 3, 1),
-		  _dconvBN(128, 128, 3, 2),
+		  # _dconvBN(128, 128, 3, 2),
 		  _dconvBN(128, 256, 3, 1),
-		  _dconvBN(256, 256, 3, 2),
+		  # _dconvBN(256, 256, 3, 2),
 		  _dconvBN(256, 512, 3, 1),
 		  _dconvBN(512, 512, 3, 2),
 		  x -> flatten(x),
-		  Dense(8 * 8 * 512, 1024),
-		  x -> leakyrelu.(x, α),
-		  Dense(1024, 1),
+		  Dense(524288, 1),
+		  # x -> leakyrelu.(x, α),
+		  # Dense(1024, 1),
 		  x -> σ.(x))
 end
 
 
 # generator definition
 _gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p);
-		  init=initialize_weights))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)))
 
 _gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p);
-		  init=initialize_weights), wrap_batchnorm(out_size)...)
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)), wrap_batchnorm(out_size)...)
 
 _conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p);
-		  init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)), wrap_batchnorm(out_size)..., PReLU(out_size))
 
 mutable struct ResidualBlock
 	conv_blocks
@@ -195,9 +190,11 @@ function (gen::Generator)(x)
 	x = gen.conv_blocks[1](x)
 	x = x .+ x_initial_conv
 
+	@info "block upsampling"
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
 	end
+	@info "upsampling done"
 	x = gen.conv_blocks[2](x)
 	tanh.(x)
 end
