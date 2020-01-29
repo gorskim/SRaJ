@@ -9,7 +9,7 @@ CuArrays.allowscalar(false)
 
 # constants
 α = 0.2f0  # leakyReLU activation
-η = 10f-4 # learning rate for optimizer (Adam)
+η = 10f-3 # learning rate for optimizer (Adam)
 β1, β2 = 0.9f0, 0.999f0  # Adam parametetrs for bias corrected moments
 ϵ = 10f-10
 
@@ -120,9 +120,9 @@ function Discriminator()
 		  _dconvBN(256, 512, 3, 1),
 		  _dconvBN(512, 512, 3, 2),
 		  x -> flatten(x),
-		  Dense(524288, 1),
-		  # x -> leakyrelu.(x, α),
-		  # Dense(1024, 1),
+		  Dense(8 * 8 * 512, 1024),
+		  x -> leakyrelu.(x, α),
+		  Dense(1024, 1),
 		  x -> σ.(x))
 end
 

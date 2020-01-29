@@ -1,3 +1,7 @@
+using Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+
 using Dates, Metalhead, Flux, Tracker
 using BSON: @save
 using Tracker:update!
@@ -29,7 +33,9 @@ vgg = load_vgg()
 losses = Dict("discriminator" => [], "generator" => [])
 
 function dloss(HR, LR)
+	@info "generating images (dloss calculation started)"
     SR = gen(LR)
+	@info "done"
     fake_prob = dis(SR)
     fake_labels = zeros(size(fake_prob)...) |> gpu
     fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
@@ -37,11 +43,13 @@ function dloss(HR, LR)
     real_labels = ones(size(real_prob)...) |> gpu
     real_dis_loss = bin_cross_entropy(real_prob, real_labels)
     output = mean(fake_dis_loss .+ real_dis_loss)
+	@info "dloss calculated"
 	push!(losses["discriminator"], output)
 	output
 end
 
 function gloss(HR, LR)
+	@info "gloss calculation started"
 	SR = gen(LR)
 	fake_prob = dis(SR)
 	real_labels = ones(size(fake_prob)...) |> gpu
@@ -50,6 +58,7 @@ function gloss(HR, LR)
 	SR_features = vgg(SR)
 	content_loss = mean(((HR_features .- SR_features)) .^2) ./ 12.75f0
 	output = 10f-3 * loss_adv + content_loss
+	@info "gloss calculated"
 	push!(losses["generator"], output)
 	output
 end
@@ -71,9 +80,13 @@ end
 
 function _train_step(HR, LR)
     HR = normalize(HR)
+	@info "Gradient of discriminator..."
     d_gs = Tracker.gradient(() -> dloss(HR, LR), params(dis))
+	@info "Updating discriminator..."
     update!(optimizer, params(dis), d_gs)
+	@info "Gradient of generator..."
     g_gs = Tracker.gradient(() -> gloss(HR, LR), params(gen))
+	@info "Updating generator..."
     update!(optimizer, params(gen), g_gs)
 end
 
@@ -113,19 +126,19 @@ function train(;prepare_dataset=false, smoke_run=false,
                              [LR_names[i] for i in minibatch_indices]
 
 	HRdata, LRdata = [], []
+	@info "Loading minibatches."
 	@showprogress for batch_num in 1:length(HR_batches)
-		@info "Loading minibatches."
 		HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
 		push!(HRdata, HR)
 		push!(LRdata, LR)
 	end
 
-    @showprogress for epoch in 1:EPOCHS
+	@info "minibatches count: $(length(HR_batches))"
+    for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
-            @info "Batch nr $batch_num - loading"
             HR, LR = HRdata[batch_num], LRdata[batch_num]
-            @info "Training..."
+            @info "$batch_num - training..................................."
             _train_step(HR |> gpu, LR |> gpu)
         end
         if epoch % checkpoint_frequency == 0
@@ -143,4 +156,4 @@ function train(;prepare_dataset=false, smoke_run=false,
     @info "COMPLETED"
 end
 
-train(prepare_dataset=false, smoke_run=true)
+train(prepare_dataset=false, smoke_run=false)
