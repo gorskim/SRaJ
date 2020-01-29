@@ -116,7 +116,14 @@ function train(;prepare_dataset=false, smoke_run=false,
         HR_names, LR_names = HR_names[1:N_SMOKE_SAMPLES], LR_names[1:N_SMOKE_SAMPLES]
         MINIBATCH_SIZE = SMOKE_MINIBATCH
         EPOCHS = SMOKE_EPOCHS
-    end
+    else
+		MODELS_PATH = "models/"
+		IMAGE_CHANNELS = 3
+		EPOCHS = 5000
+		MINIBATCH_SIZE = 128  # 32 - 128
+		GENERATOR_BLOCKS_COUNT = 8
+		CHECKPOINT_FREQUENCY = 50
+	end
 
     dataset_count = length(HR_names)
     @info "Training dataset count: $dataset_count"
