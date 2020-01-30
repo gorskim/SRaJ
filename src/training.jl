@@ -30,7 +30,8 @@ dis = Discriminator() |> gpu
 vgg = load_vgg()
 
 # losses definition
-losses = Dict("discriminator" => [], "generator" => [])
+losses = Dict("discriminator" => [], "generator" => [], "adv" => [], "content" => [],
+			   "fake_dis" => [], "real_dis" => [])
 
 function dloss(HR, LR)
 	@info "generating images (dloss calculation started)"
@@ -45,6 +46,8 @@ function dloss(HR, LR)
     output = mean(fake_dis_loss .+ real_dis_loss)
 	@info "dloss calculated"
 	push!(losses["discriminator"], output)
+	push!(losses["fake_dis"], fake_dis_loss)
+	push!(losses["real_dis"], real_dis_loss)
 	output
 end
 
@@ -60,6 +63,8 @@ function gloss(HR, LR)
 	output = 10f-3 * loss_adv + content_loss
 	@info "gloss calculated"
 	push!(losses["generator"], output)
+	push!(losses["adv"], 10f-3 * loss_adv)
+	push!(losses["content"], content_loss)
 	output
 end
 
