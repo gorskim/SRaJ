@@ -104,10 +104,10 @@ end
 
 # discriminator definition
 _dconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p)), x -> leakyrelu.(x, α))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p); init=initialize_weights), x -> leakyrelu.(x, α))
 
 _dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p)), wrap_batchnorm(out_size)...,
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p); init=initialize_weights), wrap_batchnorm(out_size)...,
 		  x -> leakyrelu.(x, α))
 
 function Discriminator()
@@ -129,13 +129,13 @@ end
 
 # generator definition
 _gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p); init=initialize_weights))
 
 _gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)), wrap_batchnorm(out_size)...)
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p); init=initialize_weights), wrap_batchnorm(out_size)...)
 
 _conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)), wrap_batchnorm(out_size)..., PReLU(out_size))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p); init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
 
 mutable struct ResidualBlock
 	conv_blocks
