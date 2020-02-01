@@ -195,7 +195,9 @@ function (gen::Generator)(x)
 	# for upsample_block in gen.upsample_blocks
 	# 	x = upsample_block(x)
 	# end
+	CuArrays.allowscalar(true)
 	x = imresize(x, 128, 128)
+	CuArrays.allowscalar(false)
 	@info "upsampling done"
 	x = gen.conv_blocks[2](x)
 	tanh.(x)
