@@ -35,7 +35,8 @@ initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
 
 
-function simple_upsampler(x, factor)
+function simple_upsampler(x)
+	factor = 2
 	ratio = (factor, factor, 1, 1)
 	(h, w, c, n) = size(x)
   	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1))
@@ -164,7 +165,7 @@ end
 
 _upsample_block(in_size::Int, out_size::Int) =
 	Chain(_gconv(in_size, out_size, 3, 1),
-		  x->simple_upsampler(x, 2),
+		  simple_upsampler,
 		  PReLU(div(out_size, UP_FACTOR)))
 
 mutable struct Generator
