@@ -15,10 +15,10 @@ include("processing.jl")
 # constants and parameters definition
 MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
-EPOCHS = 5000
-MINIBATCH_SIZE = 128  # 32 - 128
+EPOCHS = 1000
+MINIBATCH_SIZE = 32  # 32 - 128
 GENERATOR_BLOCKS_COUNT = 8
-CHECKPOINT_FREQUENCY = 50
+CHECKPOINT_FREQUENCY = 10
 
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
@@ -45,9 +45,9 @@ function dloss(HR, LR)
     real_dis_loss = bin_cross_entropy(real_prob, real_labels)
     output = mean(fake_dis_loss .+ real_dis_loss)
 	@info "dloss calculated"
-	push!(losses["discriminator"], output)
-	push!(losses["fake_dis"], fake_dis_loss)
-	push!(losses["real_dis"], real_dis_loss)
+	push!(losses["discriminator"], output |> cpu)
+	push!(losses["fake_dis"], fake_dis_loss |> cpu)
+	push!(losses["real_dis"], real_dis_loss |> cpu)
 	output
 end
 
@@ -62,9 +62,9 @@ function gloss(HR, LR)
 	content_loss = mean(((HR_features .- SR_features)) .^2) ./ 12.75f0
 	output = 10f-3 * loss_adv + content_loss
 	@info "gloss calculated"
-	push!(losses["generator"], output)
-	push!(losses["adv"], 10f-3 * loss_adv)
-	push!(losses["content"], content_loss)
+	push!(losses["generator"], output |> cpu)
+	push!(losses["adv"], 10f-3 * loss_adv |> cpu)
+	push!(losses["content"], content_loss |> cpu)
 	output
 end
 
@@ -125,9 +125,9 @@ function train(;prepare_dataset=false, smoke_run=false,
 		MODELS_PATH = "models/"
 		IMAGE_CHANNELS = 3
 		EPOCHS = 5000
-		MINIBATCH_SIZE = 16  # 32 - 128
+		MINIBATCH_SIZE = 32  # 32 - 128
 		GENERATOR_BLOCKS_COUNT = 8
-		CHECKPOINT_FREQUENCY = 50
+		CHECKPOINT_FREQUENCY = 10
 	end
 
     dataset_count = length(HR_names)

@@ -16,8 +16,8 @@ CuArrays.allowscalar(false)
 # one-liners
 
 load_image(filename) = Float32.(channelview(RGB.(load(filename))))
-get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)[1:3000]],
-                                                     [name for name in readdir(LR_path)[1:3000]]
+get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)[1:12000]],
+                                                     [name for name in readdir(LR_path)[1:12000]]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ ϵ) -
                           (1 .- y) .* log.(1 .- ŷ .+ ϵ)
 normalize(x) = convert(CuArray{Float32}, 2.0f0 .* x .- 1.0f0)
@@ -125,14 +125,14 @@ function Discriminator()
 	Chain(_dconv(3, 64, 3, 1),
 		  _dconvBN(64, 64, 3, 2),
 		  _dconvBN(64, 128, 3, 1),
-		  # _dconvBN(128, 128, 3, 2),
+		  _dconvBN(128, 128, 3, 2),
 		  _dconvBN(128, 256, 3, 1),
-		  # _dconvBN(256, 256, 3, 2),
+		  _dconvBN(256, 256, 3, 2),
 		  _dconvBN(256, 512, 3, 1),
 		  _dconvBN(512, 512, 3, 2),
 		  x -> flatten(x),
-		  # Dense(8 * 8 * 512, 1024),
-		  Dense(524288, 1024),
+		  Dense(8 * 8 * 512, 1024),
+		  #Dense(524288, 1024),
 		  x -> leakyrelu.(x, α),
 		  Dense(1024, 1),
 		  x -> σ.(x))
@@ -203,15 +203,10 @@ function (gen::Generator)(x)
 	x = x .+ x_initial_conv
 	# (32, 32, 64, 128)
 
-	@info "block upsampling"
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
-		@info "jeden poszedl"
-		@info "$(size(x))"
 	end
 
-	@info "upsampling done"
 	x = gen.conv_blocks[2](x)
-	@info "$(size(x)) koniec"
 	tanh.(x)
 end
