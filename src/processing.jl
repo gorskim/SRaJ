@@ -38,10 +38,10 @@ optimizer = ADAM(η, (β1, β2))
 function simple_upsampler(x, factor)
 	ratio = (factor, factor, 1, 1)
 	(h, w, c, n) = size(x)
-	y = similar(x, (1, ratio[1], 1, ratio[2], 1, 1))
+  	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1))
     fill!(y, 1)
-    z = reshape(x, (h, 1, w, 1, c, n))  .* y
-    reshape(permutedims(z, (2,1,4,3,5,6)), size(x) .* ratio)
+  	z = reshape(x, (1, h, 1, w, c, n))  .* y
+  	reshape(z, size(x) .* ratio)
   end
 
 # util functions and layers
