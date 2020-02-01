@@ -125,7 +125,7 @@ function train(;prepare_dataset=false, smoke_run=false,
 		MODELS_PATH = "models/"
 		IMAGE_CHANNELS = 3
 		EPOCHS = 5000
-		MINIBATCH_SIZE = 128  # 32 - 128
+		MINIBATCH_SIZE = 16  # 32 - 128
 		GENERATOR_BLOCKS_COUNT = 8
 		CHECKPOINT_FREQUENCY = 50
 	end
@@ -137,19 +137,20 @@ function train(;prepare_dataset=false, smoke_run=false,
     HR_batches, LR_batches = [HR_names[i] for i in minibatch_indices],
                              [LR_names[i] for i in minibatch_indices]
 
-	HRdata, LRdata = [], []
-	@info "Loading minibatches."
-	@showprogress for batch_num in 1:length(HR_batches)
-		HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-		push!(HRdata, HR)
-		push!(LRdata, LR)
-	end
+	# HRdata, LRdata = [], []
+	# @info "Loading minibatches."
+	# @showprogress for batch_num in 1:length(HR_batches)
+	# 	HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
+	# 	push!(HRdata, HR)
+	# 	push!(LRdata, LR)
+	# end
 
 	@info "minibatches count: $(length(HR_batches))"
     for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
-            HR, LR = HRdata[batch_num], LRdata[batch_num]
+			HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
+            # HR, LR = HRdata[batch_num], LRdata[batch_num]
             @info "$batch_num - training..................................."
             _train_step(HR |> gpu, LR |> gpu)
         end
