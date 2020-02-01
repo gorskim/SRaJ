@@ -39,8 +39,8 @@ function simple_upsampler(x)
 	factor = 2
 	ratio = (factor, factor, 1, 1)
 	(h, w, c, n) = size(x)
-  	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1))
-    fill!(y, 1)
+  	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1)) |> gpu
+    fill!(y, 1) |> gpu
   	z = reshape(x, (1, h, 1, w, c, n))  .* y
   	reshape(z, size(x) .* ratio)
   end
@@ -166,7 +166,7 @@ end
 _upsample_block(in_size::Int, out_size::Int) =
 	Chain(_gconv(in_size, out_size, 3, 1),
 		  simple_upsampler,
-		  PReLU(div(out_size, UP_FACTOR)))
+		  PReLU(div(out_size, 1)))
 
 mutable struct Generator
 	conv_initial
@@ -186,8 +186,8 @@ function Gen(blocks::Int)
 	end
 
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1, 4))
-	upsample_blocks = (_upsample_block(64, 256), _upsample_block(64, 256))
+	conv_blocks = (_gconvBN(64, 64), _gconv(256, 3, 3, 1, 1))
+	upsample_blocks = (_upsample_block(64, 256), _upsample_block(256, 256))
 	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
 
@@ -206,11 +206,12 @@ function (gen::Generator)(x)
 	@info "block upsampling"
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
+		@info "jeden poszedl"
+		@info "$(size(x))"
 	end
-	@info "$(size(x))"
 
 	@info "upsampling done"
 	x = gen.conv_blocks[2](x)
-	@info "$(size(x))"
+	@info "$(size(x)) koniec"
 	tanh.(x)
 end
