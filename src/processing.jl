@@ -34,6 +34,16 @@ same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
 
+
+function simple_upsampler(x, factor)
+	ratio = (factor, factor, 1, 1)
+	(h, w, c, n) = size(x)
+	y = similar(x, (1, ratio[1], 1, ratio[2], 1, 1))
+    fill!(y, 1)
+    z = reshape(x, (h, 1, w, 1, c, n))  .* y
+    reshape(permutedims(z, (2,1,4,3,5,6)), size(x) .* ratio)
+  end
+
 # util functions and layers
 function load_vgg()
     vgg = VGG19() |> gpu  # Metalhead.jl
@@ -154,7 +164,7 @@ end
 
 _upsample_block(in_size::Int, out_size::Int) =
 	Chain(_gconv(in_size, out_size, 3, 1),
-		  x->_shuffle_pixels(x, 2),
+		  x->simple_upsampler(x, 2),
 		  PReLU(div(out_size, UP_FACTOR)))
 
 mutable struct Generator
@@ -190,15 +200,16 @@ function (gen::Generator)(x)
 
 	x = gen.conv_blocks[1](x)
 	x = x .+ x_initial_conv
+	# (32, 32, 64, 128)
 
 	@info "block upsampling"
-	# for upsample_block in gen.upsample_blocks
-	# 	x = upsample_block(x)
-	# end
-	CuArrays.allowscalar(true)
-	x = imresize(x, 128, 128)
-	CuArrays.allowscalar(false)
+	for upsample_block in gen.upsample_blocks
+		x = upsample_block(x)
+	end
+	@info "$(size(x))"
+
 	@info "upsampling done"
 	x = gen.conv_blocks[2](x)
+	@info "$(size(x))"
 	tanh.(x)
 end
