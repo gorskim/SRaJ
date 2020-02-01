@@ -192,9 +192,10 @@ function (gen::Generator)(x)
 	x = x .+ x_initial_conv
 
 	@info "block upsampling"
-	for upsample_block in gen.upsample_blocks
-		x = upsample_block(x)
-	end
+	# for upsample_block in gen.upsample_blocks
+	# 	x = upsample_block(x)
+	# end
+	x = imresize(x, 128, 128)
 	@info "upsampling done"
 	x = gen.conv_blocks[2](x)
 	tanh.(x)
