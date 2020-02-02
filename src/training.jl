@@ -38,10 +38,10 @@ function dloss(HR, LR)
 	@info "done"
     fake_prob = dis(SR)
     fake_labels = zeros(size(fake_prob)...) |> gpu
-    fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
+    fake_dis_loss = bce_with_logits(fake_prob, fake_labels)
     real_prob = dis(HR)
     real_labels = ones(size(real_prob)...) |> gpu
-    real_dis_loss = bin_cross_entropy(real_prob, real_labels)
+    real_dis_loss = bce_with_logits(real_prob, real_labels)
     output = mean(fake_dis_loss .+ real_dis_loss)
 	@info "dloss calculated"
 	push!(losses["discriminator"], output |> cpu)
@@ -53,7 +53,7 @@ function gloss(HR, LR)
 	SR = gen(LR)
 	fake_prob = dis(SR)
 	real_labels = ones(size(fake_prob)...) |> gpu
-	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
+	loss_adv = mean(bce_with_logits(fake_prob, real_labels))
 	HR_features = vgg(HR)
 	SR_features = vgg(SR)
 	content_loss = mean(((HR_features .- SR_features)) .^2) ./ 12.75f0

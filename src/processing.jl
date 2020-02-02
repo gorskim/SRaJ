@@ -9,8 +9,8 @@ CuArrays.allowscalar(false)
 
 # constants
 α = 0.2f0  # leakyReLU activation
-η = 10^(-4) # learning rate for optimizer (Adam)
-β1, β2 = 0.9f0, 0.999f0  # Adam parametetrs for bias corrected moments
+η = 20^(-5) # learning rate for optimizer (Adam)
+β1, β2 = 0.5f0, 0.999f0  # Adam parametetrs for bias corrected moments
 ϵ = 10f-10
 
 # one-liners
@@ -20,6 +20,8 @@ get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(H
                                                      [name for name in readdir(LR_path)[1:12000]]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ ϵ) -
                           (1 .- y) .* log.(1 .- ŷ .+ ϵ)
+bce_with_logits(ŷ, y) = -y .* log.(σ.(ŷ) .+ ϵ) -
+                          (1 .- y) .* log.(1 .- σ.(ŷ) .+ ϵ)
 normalize(x) = convert(CuArray{Float32}, 2.0f0 .* x .- 1.0f0)
 denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0f0) ./ 2.0f0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
@@ -33,7 +35,6 @@ same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - 
 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
-optimizer = ADAM(20^(-5), (0.5f0, 0.999f0)) # changes after 1st learning
 
 
 function simple_upsampler(x)
