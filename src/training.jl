@@ -18,7 +18,7 @@ IMAGE_CHANNELS = 3
 EPOCHS = 1000
 MINIBATCH_SIZE = 32  # 32 - 128
 GENERATOR_BLOCKS_COUNT = 8
-CHECKPOINT_FREQUENCY = 10
+CHECKPOINT_FREQUENCY = 5
 
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
@@ -30,8 +30,7 @@ dis = Discriminator() |> gpu
 vgg = load_vgg()
 
 # losses definition
-losses = Dict("discriminator" => [], "generator" => [], "adv" => [], "content" => [],
-			   "fake_dis" => [], "real_dis" => [])
+losses = Dict("discriminator" => [], "generator" => [], "adv" => [], "content" => [])
 
 function dloss(HR, LR)
 	@info "generating images (dloss calculation started)"
@@ -46,8 +45,6 @@ function dloss(HR, LR)
     output = mean(fake_dis_loss .+ real_dis_loss)
 	@info "dloss calculated"
 	push!(losses["discriminator"], output |> cpu)
-	push!(losses["fake_dis"], fake_dis_loss |> cpu)
-	push!(losses["real_dis"], real_dis_loss |> cpu)
 	output
 end
 
@@ -127,7 +124,7 @@ function train(;prepare_dataset=false, smoke_run=false,
 		EPOCHS = 5000
 		MINIBATCH_SIZE = 32  # 32 - 128
 		GENERATOR_BLOCKS_COUNT = 8
-		CHECKPOINT_FREQUENCY = 10
+		CHECKPOINT_FREQUENCY = 5
 	end
 
     dataset_count = length(HR_names)

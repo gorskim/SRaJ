@@ -33,6 +33,7 @@ same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - 
 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
+optimizer = ADAM(20^(-5), (0.5f0, 0.999f0)) # changes after 1st learning
 
 
 function simple_upsampler(x)
@@ -134,8 +135,7 @@ function Discriminator()
 		  Dense(8 * 8 * 512, 1024),
 		  #Dense(524288, 1024),
 		  x -> leakyrelu.(x, α),
-		  Dense(1024, 1),
-		  x -> σ.(x))
+		  Dense(1024, 1))
 end
 
 
