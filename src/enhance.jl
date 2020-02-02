@@ -1,15 +1,36 @@
 using Pkg
-for p in ("Flux", "Plots")
-    haskey(Pkg.installed(), p) || Pkg.add(p)
-end
+Pkg.activate(".")
+Pkg.instantiate()
 
-using ArgParse, Knet
-
+using Images, ImageMagick, Colors
+using Flux, Tracker, CuArrays
+using BSON: @load
 include("processing.jl")
 
-# addparser
 
-function main(model_path::String)
-    @load model_path weights
-    Flux.loadparams!(generator, weights)
+model_path = "models/model15.bson"
+@load model_path model
+
+
+function load_LR_image(filepath)
+    img = [load_image(filename)]
+    out = reshape(cat(img..., dims=1), 32, 32, 3, 1)
+    out
+end
+
+
+function save_SR_image(img, image_name)
+    @info "$(size(img))"
+    SR = SR[:, :, :, 1]
+    SR = reshape(SR, 3, 32, 32)
+    out = colorview(RGB, SR[1,:,:], SR[2,:,:], SR[3,:,:])
+    out_name = "$(image_name)-SR.png"
+    save(out_name, out)
+end
+
+
+function enhance(image_name)
+    LR = load_LR_image(image_name)
+    SR = gen(LR)
+    save_SR_image(SR, image_name)
 end
