@@ -9,17 +9,19 @@ CuArrays.allowscalar(false)
 
 # constants
 α = 0.2f0  # leakyReLU activation
-η = 10f-3 # learning rate for optimizer (Adam)
-β1, β2 = 0.9f0, 0.999f0  # Adam parametetrs for bias corrected moments
+η = 20^(-5) # learning rate for optimizer (Adam)
+β1, β2 = 0.5f0, 0.999f0  # Adam parametetrs for bias corrected moments
 ϵ = 10f-10
 
 # one-liners
 
 load_image(filename) = Float32.(channelview(RGB.(load(filename))))
-get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)[1:50000]],
-                                                     [name for name in readdir(LR_path)[1:50000]]
+get_images_names(HR_path::String, LR_path::String) = [name for name in readdir(HR_path)[1:12000]],
+                                                     [name for name in readdir(LR_path)[1:12000]]
 bin_cross_entropy(ŷ, y) = -y .* log.(ŷ .+ ϵ) -
                           (1 .- y) .* log.(1 .- ŷ .+ ϵ)
+bce_with_logits(ŷ, y) = -y .* log.(σ.(ŷ) .+ ϵ) -
+                          (1 .- y) .* log.(1 .- σ.(ŷ) .+ ϵ)
 normalize(x) = convert(CuArray{Float32}, 2.0f0 .* x .- 1.0f0)
 denormalize(x) = convert(CuArray{Float32}, ((x .+ 1.0f0) ./ 2.0f0))
 squeeze_dims(x) = dropdims(x, dims=tuple(findall(size(x) .== 1)...))
@@ -33,6 +35,17 @@ same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - 
 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
 optimizer = ADAM(η, (β1, β2))
+
+
+function simple_upsampler(x)
+	factor = 2
+	ratio = (factor, factor, 1, 1)
+	(h, w, c, n) = size(x)
+  	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1)) |> gpu
+    fill!(y, 1) |> gpu
+  	z = reshape(x, (1, h, 1, w, c, n))  .* y
+  	reshape(z, size(x) .* ratio)
+  end
 
 # util functions and layers
 function load_vgg()
@@ -104,38 +117,38 @@ end
 
 # discriminator definition
 _dconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p)), x -> leakyrelu.(x, α))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p, p); init=initialize_weights), x -> leakyrelu.(x, α))
 
 _dconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p)), wrap_batchnorm(out_size)...,
+	Chain(Conv((k, k), in_size=>out_size, stride=(s,s), pad=(p ,p); init=initialize_weights), wrap_batchnorm(out_size)...,
 		  x -> leakyrelu.(x, α))
 
 function Discriminator()
 	Chain(_dconv(3, 64, 3, 1),
 		  _dconvBN(64, 64, 3, 2),
 		  _dconvBN(64, 128, 3, 1),
-		  # _dconvBN(128, 128, 3, 2),
+		  _dconvBN(128, 128, 3, 2),
 		  _dconvBN(128, 256, 3, 1),
-		  # _dconvBN(256, 256, 3, 2),
+		  _dconvBN(256, 256, 3, 2),
 		  _dconvBN(256, 512, 3, 1),
 		  _dconvBN(512, 512, 3, 2),
 		  x -> flatten(x),
 		  Dense(8 * 8 * 512, 1024),
+		  #Dense(524288, 1024),
 		  x -> leakyrelu.(x, α),
-		  Dense(1024, 1),
-		  x -> σ.(x))
+		  Dense(1024, 1))
 end
 
 
 # generator definition
 _gconv(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p); init=initialize_weights))
 
 _gconvBN(in_size::Int, out_size::Int, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)), wrap_batchnorm(out_size)...)
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p); init=initialize_weights), wrap_batchnorm(out_size)...)
 
 _conv_block(in_size=64, out_size=64, k=3, s=1, p=1) =
-	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p)), wrap_batchnorm(out_size)..., PReLU(out_size))
+	Chain(Conv((k, k), in_size=>out_size, stride=(s, s), pad=(p, p); init=initialize_weights), wrap_batchnorm(out_size)..., PReLU(out_size))
 
 mutable struct ResidualBlock
 	conv_blocks
@@ -153,8 +166,8 @@ end
 
 _upsample_block(in_size::Int, out_size::Int) =
 	Chain(_gconv(in_size, out_size, 3, 1),
-		  x->_shuffle_pixels(x, 2),
-		  PReLU(div(out_size, UP_FACTOR)))
+		  simple_upsampler,
+		  PReLU(div(out_size, 1)))
 
 mutable struct Generator
 	conv_initial
@@ -174,8 +187,8 @@ function Gen(blocks::Int)
 	end
 
 	residual_blocks = tuple(residual_blocks...)
-	conv_blocks = (_gconvBN(64, 64), _gconv(64, 3, 9, 1, 4))
-	upsample_blocks = (_upsample_block(64, 256), _upsample_block(64, 256))
+	conv_blocks = (_gconvBN(64, 64), _gconv(256, 3, 3, 1, 1))
+	upsample_blocks = (_upsample_block(64, 256), _upsample_block(256, 256))
 	Generator(conv_initial, residual_blocks, conv_blocks, upsample_blocks)
 end
 
@@ -189,12 +202,12 @@ function (gen::Generator)(x)
 
 	x = gen.conv_blocks[1](x)
 	x = x .+ x_initial_conv
+	# (32, 32, 64, 128)
 
-	@info "block upsampling"
 	for upsample_block in gen.upsample_blocks
 		x = upsample_block(x)
 	end
-	@info "upsampling done"
+
 	x = gen.conv_blocks[2](x)
 	tanh.(x)
 end

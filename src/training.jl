@@ -15,10 +15,10 @@ include("processing.jl")
 # constants and parameters definition
 MODELS_PATH = "models/"
 IMAGE_CHANNELS = 3
-EPOCHS = 5000
-MINIBATCH_SIZE = 128  # 32 - 128
+EPOCHS = 1000
+MINIBATCH_SIZE = 32  # 32 - 128
 GENERATOR_BLOCKS_COUNT = 8
-CHECKPOINT_FREQUENCY = 50
+CHECKPOINT_FREQUENCY = 5
 
 # smoke variables - to test if everything works fine
 N_SMOKE_SAMPLES = 6
@@ -30,7 +30,7 @@ dis = Discriminator() |> gpu
 vgg = load_vgg()
 
 # losses definition
-losses = Dict("discriminator" => [], "generator" => [])
+losses = Dict("discriminator" => [], "generator" => [], "adv" => [], "content" => [])
 
 function dloss(HR, LR)
 	@info "generating images (dloss calculation started)"
@@ -38,13 +38,13 @@ function dloss(HR, LR)
 	@info "done"
     fake_prob = dis(SR)
     fake_labels = zeros(size(fake_prob)...) |> gpu
-    fake_dis_loss = bin_cross_entropy(fake_prob, fake_labels)
+    fake_dis_loss = bce_with_logits(fake_prob, fake_labels)
     real_prob = dis(HR)
     real_labels = ones(size(real_prob)...) |> gpu
-    real_dis_loss = bin_cross_entropy(real_prob, real_labels)
+    real_dis_loss = bce_with_logits(real_prob, real_labels)
     output = mean(fake_dis_loss .+ real_dis_loss)
 	@info "dloss calculated"
-	push!(losses["discriminator"], output)
+	push!(losses["discriminator"], output |> cpu)
 	output
 end
 
@@ -53,13 +53,15 @@ function gloss(HR, LR)
 	SR = gen(LR)
 	fake_prob = dis(SR)
 	real_labels = ones(size(fake_prob)...) |> gpu
-	loss_adv = mean(bin_cross_entropy(fake_prob, real_labels))
+	loss_adv = mean(bce_with_logits(fake_prob, real_labels))
 	HR_features = vgg(HR)
 	SR_features = vgg(SR)
 	content_loss = mean(((HR_features .- SR_features)) .^2) ./ 12.75f0
 	output = 10f-3 * loss_adv + content_loss
 	@info "gloss calculated"
-	push!(losses["generator"], output)
+	push!(losses["generator"], output |> cpu)
+	push!(losses["adv"], 10f-3 * loss_adv |> cpu)
+	push!(losses["content"], content_loss |> cpu)
 	output
 end
 
@@ -116,7 +118,14 @@ function train(;prepare_dataset=false, smoke_run=false,
         HR_names, LR_names = HR_names[1:N_SMOKE_SAMPLES], LR_names[1:N_SMOKE_SAMPLES]
         MINIBATCH_SIZE = SMOKE_MINIBATCH
         EPOCHS = SMOKE_EPOCHS
-    end
+    else
+		MODELS_PATH = "models/"
+		IMAGE_CHANNELS = 3
+		EPOCHS = 5000
+		MINIBATCH_SIZE = 32  # 32 - 128
+		GENERATOR_BLOCKS_COUNT = 8
+		CHECKPOINT_FREQUENCY = 5
+	end
 
     dataset_count = length(HR_names)
     @info "Training dataset count: $dataset_count"
@@ -125,19 +134,20 @@ function train(;prepare_dataset=false, smoke_run=false,
     HR_batches, LR_batches = [HR_names[i] for i in minibatch_indices],
                              [LR_names[i] for i in minibatch_indices]
 
-	HRdata, LRdata = [], []
-	@info "Loading minibatches."
-	@showprogress for batch_num in 1:length(HR_batches)
-		HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
-		push!(HRdata, HR)
-		push!(LRdata, LR)
-	end
+	# HRdata, LRdata = [], []
+	# @info "Loading minibatches."
+	# @showprogress for batch_num in 1:length(HR_batches)
+	# 	HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
+	# 	push!(HRdata, HR)
+	# 	push!(LRdata, LR)
+	# end
 
 	@info "minibatches count: $(length(HR_batches))"
     for epoch in 1:EPOCHS
         @info "---Epoch: $epoch---"
         for batch_num in 1:length(HR_batches)
-            HR, LR = HRdata[batch_num], LRdata[batch_num]
+			HR, LR = _get_minibatch(HR_batches[batch_num], LR_batches[batch_num])
+            # HR, LR = HRdata[batch_num], LRdata[batch_num]
             @info "$batch_num - training..................................."
             _train_step(HR |> gpu, LR |> gpu)
         end
