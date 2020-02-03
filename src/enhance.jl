@@ -3,17 +3,19 @@ Pkg.activate(".")
 Pkg.instantiate()
 
 using Images, ImageMagick, Colors
-using Flux, Tracker, CuArrays
+using Flux, Tracker
+# using CuArrays
 using BSON: @load
-include("processing.jl")
+
+include("src/processing.jl")
 
 
-model_path = "models/model15.bson"
+model_path = "models/model20.bson"
 @load model_path model
 
 
 function load_LR_image(filepath)
-    img = [load_image(filename)]
+    img = [load_image(filepath)]
     out = reshape(cat(img..., dims=1), 32, 32, 3, 1)
     out
 end
@@ -21,16 +23,16 @@ end
 
 function save_SR_image(img, image_name)
     @info "$(size(img))"
-    SR = SR[:, :, :, 1]
-    SR = reshape(SR, 3, 32, 32)
+    SR = img[:, :, :, 1]
+    SR = reshape(SR, 3, size(img)[1], size(img)[2])
     out = colorview(RGB, SR[1,:,:], SR[2,:,:], SR[3,:,:])
-    out_name = "$(image_name)-SR.png"
+    out_name = "SR-$(image_name)"
     save(out_name, out)
 end
 
 
 function enhance(image_name)
     LR = load_LR_image(image_name)
-    SR = gen(LR)
+    SR = model(LR).data
     save_SR_image(SR, image_name)
 end
