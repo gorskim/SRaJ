@@ -42,8 +42,12 @@ dis_optimizer = ADAM(η_dis, (β1, β2))
 
 function simple_upsampler(x)
 	factor = 2
-	x = imresize(x, factor * size(x)[1], factor * size(x)[2])
-	x
+	ratio = (factor, factor, 1, 1)
+	(h, w, c, n) = size(x)
+  	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1)) |> gpu
+    fill!(y, 1) |> gpu
+  	z = reshape(x, (1, h, 1, w, c, n))  .* y
+  	reshape(z, size(x) .* ratio)
   end
 
 # util functions and layers
