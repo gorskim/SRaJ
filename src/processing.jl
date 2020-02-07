@@ -9,7 +9,8 @@ CuArrays.allowscalar(false)
 
 # constants
 α = 0.2f0  # leakyReLU activation
-η = 20^(-5) # learning rate for optimizer (Adam)
+η_dis = 50f-5
+η_gen = 10f-5 # learning rate for optimizer (Adam)
 β1, β2 = 0.5f0, 0.999f0  # Adam parametetrs for bias corrected moments
 ϵ = 10f-10
 
@@ -34,17 +35,15 @@ same_padding(in_dim::Int, k::Int, s::Int) = Int(0.5 * ((in_size) - 1) * s + k - 
 
 
 initialize_weights(shape...) = map(Float32, rand(Normal(0, 0.02f0), shape...))
-optimizer = ADAM(η, (β1, β2))
+
+gen_optimizer = ADAM(η_gen, (β1, β2))
+dis_optimizer = ADAM(η_dis, (β1, β2))
 
 
 function simple_upsampler(x)
 	factor = 2
-	ratio = (factor, factor, 1, 1)
-	(h, w, c, n) = size(x)
-  	y = similar(x, (ratio[1], 1, ratio[2], 1, 1, 1)) |> gpu
-    fill!(y, 1) |> gpu
-  	z = reshape(x, (1, h, 1, w, c, n))  .* y
-  	reshape(z, size(x) .* ratio)
+	x = imresize(x, factor * size(x)[1], factor * size(x)[2])
+	x
   end
 
 # util functions and layers
@@ -66,14 +65,19 @@ end
 PReLU(img_channels::Int; init=Flux.glorot_uniform) = PReLU(param(init(img_channels)))
 
 function (m::PReLU)(x)
+	if length(size(x)) == 3
+		x = reshape(x, size(x)[1], size(x)[2], size(x)[3], 1)
+	end
+
 	channels_count = size(x)[end - 1]
+
 	if channels_count == length(m.α)
 		return max.(0.0f0, x) .+
 			  (reshape(m.α, ones(Int64, length(size(x)) - 2)...,
 	                   length(m.α), 1) .* min.(0.0f0, x))
     else
 		error("Dimensions mismatch.\n
-		       length of α: $(length(m.α))\nnumber of channels: $(size(x)[end-1])")
+		       length of α: $(length(m.α))\nnumber of channels: $(channels_count)")
 	end
 end
 
