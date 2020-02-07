@@ -41,7 +41,7 @@ function dloss(HR, LR)
     fake_dis_loss = bce_with_logits(fake_prob, fake_labels)
     real_prob = dis(HR)
     real_labels = ones(size(real_prob)...)
-    real_labels = fill(real_labels, 0.9f0) |> gpu
+    fill!(real_labels, 0.9f0) |> gpu
     real_dis_loss = bce_with_logits(real_prob, real_labels)
     output = mean(fake_dis_loss .+ real_dis_loss)
 	@info "dloss calculated"
